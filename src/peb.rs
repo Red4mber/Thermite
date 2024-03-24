@@ -1,17 +1,20 @@
 #![allow(nonstandard_style)]
-#![allow(dead_code)]
+// #![allow(dead_code)]
 #![allow(unused)]
 
 // PURE UNADULTERATED SUFFERING AHEAD
-
+// somewhat complete windows structures with undocumented fields
+//
 // Most of these structs were dumped using WinDbg on Win11 22H2
 // Nothing has been really confirmed
 // Offset errors regularly happen, expect that it will
+// We don't really need all this, but I leave it anyway, just in case
 
-use std::fmt;
-use std::ffi::c_void;
-// use std::fmt::Write;
-use std::mem::size_of;      // For Tests
+use std::{
+    fmt,
+    mem::size_of,
+    ffi::c_void
+};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -20,39 +23,12 @@ pub struct LIST_ENTRY {
     pub Blink: *mut LIST_ENTRY,
 }
 
-/*
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct LDR_MODULE {
-    pub InLoadOrderLinks: LIST_ENTRY,
-    pub InMemoryOrderLinks: LIST_ENTRY,
-    pub InInitializationOrderLinks: LIST_ENTRY,
-    pub DllBase: *mut c_void,
-    pub EntryPoint: *mut c_void,
-    pub SizeOfImage: u32,
-    pub FullDllName: UNICODE_STRING,
-    pub BaseDllName: UNICODE_STRING,
-    pub FlagGroup: [u8; 4],
-    pub ObsoleteLoadCount: u16,
-    pub TlsIndex: u16,
-    pub HashLinks: LIST_ENTRY,
-    pub TimeDateStamp: u32
-}
-*/
-
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct _IN_PROGRESS_LINKS {
-    pub InInitializationOrderLinks: LIST_ENTRY,
-    pub InProgressLinks: LIST_ENTRY,
-}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct LDR_DATA_TABLE_ENTRY {
     pub InLoadOrderLinks: LIST_ENTRY,
     pub InMemoryOrderLinks: LIST_ENTRY,
-    pub InInitializationOrderLinks: _IN_PROGRESS_LINKS,
+    pub InInitializationOrderLinks: LIST_ENTRY,
     pub DllBase: *mut c_void,
     pub EntryPoint: *mut c_void,
     pub SizeOfImage: u32,
@@ -84,6 +60,10 @@ pub struct LDR_DATA_TABLE_ENTRY {
     pub ActivePatchImageBase: *mut c_void,
     pub HotPatchState: LDR_HOT_PATCH_STATE,
 }
+
+// Beware
+// A ton of bullshit past this line
+/////////////////////////////////////////
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LDR_HOT_PATCH_STATE {
@@ -98,8 +78,8 @@ pub enum LDR_HOT_PATCH_STATE {
 #[derive(Debug, Copy, Clone)]
 pub struct RTL_BALANCED_NODE {
     pub Children: [*mut RTL_BALANCED_NODE; 2],
-    // This one may be wrong, i don't really give a shit
-    // Dammit i hate C unions in Rust FFI
+    // This one may be wrong, I don't really give a shit
+    // Dammit I hate C unions in Rust FFI
     pub ParentValue: u64,
 }
 impl RTL_BALANCED_NODE {
@@ -261,8 +241,8 @@ pub struct PEB {
     pub TlsExpansionBitmapBits: [u32; 32],
     pub SessionId: u32,
     pub Padding5: [u8; 4],
-    pub AppCompatFlags: u64, // ULARGE_INTEGER,
-    pub AppCompatFlagsUser: u64, // ULARGE_INTEGER,
+    pub AppCompatFlags: ULARGE_INTEGER,
+    pub AppCompatFlagsUser: ULARGE_INTEGER,
     pub pShimData: *mut c_void,
     pub AppCompatInfo: *mut c_void,
     pub CSDVersion: UNICODE_STRING,
@@ -306,8 +286,9 @@ pub union _KernelCallbackTable {
     pub KernelCallbackTable: *mut c_void,
     pub UserSharedInfoPtr: *mut c_void,
 }
-impl std::fmt::Debug for _KernelCallbackTable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+// Debug can't be derived from unions x_X
+impl fmt::Debug for _KernelCallbackTable {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         unsafe {
             f.debug_set()
                 .entry(&self.KernelCallbackTable)
@@ -318,7 +299,21 @@ impl std::fmt::Debug for _KernelCallbackTable {
 }
 
 
-
+#[repr(i32)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum LDR_DLL_LOAD_REASON {
+    LoadReasonStaticDependency = 0,
+    LoadReasonStaticForwarderDependency = 1,
+    LoadReasonDynamicForwarderDependency = 2,
+    LoadReasonDelayloadDependency = 3,
+    LoadReasonDynamicLoad = 4,
+    LoadReasonAsImageLoad = 5,
+    LoadReasonAsDataLoad = 6,
+    LoadReasonEnclavePrimary = 7,
+    LoadReasonEnclaveDependency = 8,
+    LoadReasonPatchImage = 9,
+    LoadReasonUnknown = -1,
+}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -384,7 +379,7 @@ pub struct CURDIR {
 
 
 #[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone)]
 pub struct UNICODE_STRING {
     pub Length: u16,
     pub MaximumLength: u16,
@@ -392,12 +387,10 @@ pub struct UNICODE_STRING {
 }
 impl fmt::Display for UNICODE_STRING {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // There's a borrow error in here according to clippy
-        // But it still compiles and it still works fine...
         let buffer = unsafe {
             std::slice::from_raw_parts(
                 (&self).Buffer as *const _,
-                (&self.Length / 2u16) as usize
+                std::cmp::min((&self.Length / 2u16) as usize, 150)
             )
         };
         let str = String::from_utf16_lossy(buffer);
@@ -405,45 +398,51 @@ impl fmt::Display for UNICODE_STRING {
         Ok(())
     }
 }
-// impl std::fmt::Debug for UNICODE_STRING {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         fmt::Display::fmt(self, f)
-//     }
-// }
-
-#[repr(i32)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum LDR_DLL_LOAD_REASON {
-    LoadReasonStaticDependency = 0,
-    LoadReasonStaticForwarderDependency = 1,
-    LoadReasonDynamicForwarderDependency = 2,
-    LoadReasonDelayloadDependency = 3,
-    LoadReasonDynamicLoad = 4,
-    LoadReasonAsImageLoad = 5,
-    LoadReasonAsDataLoad = 6,
-    LoadReasonEnclavePrimary = 7,
-    LoadReasonEnclaveDependency = 8,
-    LoadReasonPatchImage = 9,
-    LoadReasonUnknown = -1,
+impl fmt::Debug for UNICODE_STRING {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
 }
 
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct LARGE_INTEGER {
+    low_part: u32,
+    high_part: i32,
+}
+impl fmt::Display for LARGE_INTEGER {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let high = self.high_part.clone() as i64;
+        let low = self.low_part.clone() as u64;
+        write!(f, "{}", (high << 32) | low as i64)
+    }
+}
+impl fmt::Debug for LARGE_INTEGER {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
 
-// We don't really need all this, but I leave it anyway, just in case
-
-// #[repr(C)]
-// #[derive(Debug, Copy, Clone)]
-// pub struct LARGE_INTEGER {
-//     low_part: u32,
-//     high_part: i32,
-// }
-//
-// #[repr(C)]
-// #[derive(Debug, Copy, Clone)]
-// pub struct ULARGE_INTEGER {
-//     low_part: u32,
-//     high_part: u32,
-// }
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct ULARGE_INTEGER {
+    low_part: u32,
+    high_part: u32,
+}
+impl fmt::Display for ULARGE_INTEGER {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let high = self.high_part.clone() as u64;
+        let low = self.low_part.clone() as u64;
+        write!(f, "{}", (high << 32) | low)
+    }
+}
+impl fmt::Debug for ULARGE_INTEGER {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Display::fmt(self, f)
+    }
+}
 
 // // // TESTS // // //
-
-// assert_eq!(std::mem::size_of()::<LDR_DATA_TABLE_ENTRY>(), 0x134);
+// Would be cool to test the offset to rest assured the structs are correct
+// Something like :
+// assert_eq!(0x134, size_of::<f64>());
