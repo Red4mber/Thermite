@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "hells-gate"
+name = "thermite"
 version = "0.1.0"

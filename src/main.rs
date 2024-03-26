@@ -1,48 +1,25 @@
-#![feature(pointer_byte_offsets)]
 
 
-use std::ffi::c_void;
-
-use crate::peb::*;
-
-mod peb;
-
-use std::arch::asm;
-use std::ptr;
-
-unsafe fn get_peb() -> PEB {
-    let peb_ptr: *const PEB;
-    asm!("mov {}, gs:[0x60]", out(reg) peb_ptr);
-    ptr::read_unaligned(peb_ptr)
-}
-unsafe fn get_module_base_address(module_name: &str) -> Option<*const c_void> {
-    let peb = get_peb();
-    let last_module = (*peb.Ldr).InMemoryOrderModuleList.Blink;
-    let mut module_entry: *mut LIST_ENTRY = (*peb.Ldr).InMemoryOrderModuleList.Flink;
-    let mut module_base: *const LDR_DATA_TABLE_ENTRY;
-
-    loop {
-        module_base = module_entry.byte_sub(0x10) as *const LDR_DATA_TABLE_ENTRY;
-        println!("[?-?] Module : {}", (*module_base).BaseDllName);
-        if (*module_base).BaseDllName.to_string().eq_ignore_ascii_case( module_name ) {
-            println!("[^-^] Module Found at address : {:x?}", (*module_base).DllBase);
-            return Some((*module_base).DllBase);
-        }
-        if module_entry == last_module {
-            eprintln!("[TwT] Module not found !");
-            return None
-        }
-
-        module_entry = (*module_entry).Flink;
-    }
-}
-
+use thermite::{get_module_address, get_function_address};
 
 fn main() {
     unsafe {
-        let _ntdll_base = get_module_base_address("ssss.dll");
+        let module_name = "ntdll.dll";
+        let function_name = "NtOpenProcess";
 
+        let module_address = get_module_address(module_name).unwrap_or_else(|err| {
+            eprintln!("[TwT] {:#?}", err);
+            std::process::exit(1)
+        });
+        println!("[^-^] Module {:?} found at address : {:?}", module_name, module_address);
+        println!("[^-^] Looking for function {:#x?}", function_name);
 
+        // let address = get_function_address(function_name, module_address);
+        let result = get_function_address(function_name, module_address);
+        match result {
+            Ok(function_address) => println!("[^o^] Function address: {:?}", function_address),
+            Err(error) => println!("[TwT] {:?}", error),
+        }
     }
 }
 

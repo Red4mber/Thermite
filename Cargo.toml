@@ -1,8 +1,20 @@
 [package]
-name = "hells-gate"
+name = "thermite"
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+
+
+
+[profile.release]
+debug = false           # Well of course
+lto = true              # Link Time Optimization. Produces better optimized code at the cost of longer linking time.
+opt-level = "s"         # just S because Z is not that smaller and loop vectorization is cool
+overflow-checks = false # When overflow-checks are enabled, a panic will occur on overflow.
+strip = "symbols"       # Equivalent to strip = true  # Max strip level 
+debug-assertions=false  # Disable debug assertion, no cool in release 
+panic="abort"           # Only two valid options and I don't want unwind
+rpath = false           # Disables the runtime search path to find required libraries
