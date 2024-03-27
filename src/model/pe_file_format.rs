@@ -60,7 +60,7 @@ pub const IMAGE_NT_OPTIONAL_HDR_MAGIC: u16 = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
 //              BITFLAGS
 //
 //  My best shot at implementing C-Style bitflags in native rust
-// 
+//  I Haven't done any methods or macro to handle the logic yet
 //------------------------------------------------------------------
 /// Characteristics of the image
 pub mod ImageFileCharacteristics {
