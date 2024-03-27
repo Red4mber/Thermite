@@ -38,8 +38,8 @@ pub struct PEB {
     pub Padding0: [u8; 4],
     pub Mutant: *const c_void,
     pub ImageBaseAddress: *const c_void,
-    pub Ldr: *mut PEB_LDR_DATA,
-    pub ProcessParameters: *mut RTL_USER_PROCESS_PARAMETERS,
+    pub Ldr: *const PEB_LDR_DATA,
+    pub ProcessParameters: *const RTL_USER_PROCESS_PARAMETERS,
     pub SubSystemData: *const c_void,
     pub ProcessHeap: *const c_void,
     pub FastPebLock: *const c_void, // _RTL_CRITICAL_SECTION NYI
@@ -57,7 +57,7 @@ pub struct PEB {
     pub TlsBitmapBits: [u32; 2],
     pub ReadOnlySharedMemoryBase: *const c_void,
     pub SharedData: *const c_void,
-    pub ReadOnlyStaticServerData: *mut *const c_void,
+    pub ReadOnlyStaticServerData: *const *const c_void,
     pub AnsiCodePageData: *const c_void,
     pub OemCodePageData: *const c_void,
     pub UnicodeCaseTableData: *const c_void,
@@ -70,7 +70,7 @@ pub struct PEB {
     pub HeapDeCommitFreeBlockThreshold: u64,
     pub NumberOfHeaps: u32,
     pub MaximumNumberOfHeaps: u32,
-    pub ProcessHeaps: *mut *const c_void,
+    pub ProcessHeaps: *const *const c_void,
     pub GdiSharedHandleTable: *const c_void,
     pub ProcessStarterHelper: *const c_void,
     pub GdiDCAttributeList: u32,
@@ -154,17 +154,17 @@ pub struct PEB_LDR_DATA {
 #[derive(Debug, Copy, Clone)]
 pub struct LIST_ENTRY {
     /// Forward Link
-    pub Flink: *mut LIST_ENTRY,
+    pub Flink: *const LIST_ENTRY,
 
     /// Backwards Link
-    pub Blink: *mut LIST_ENTRY,
+    pub Blink: *const LIST_ENTRY,
 }
 
 /// Single-linked list
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct SINGLE_LIST_ENTRY {
-    pub Next: *mut SINGLE_LIST_ENTRY,
+    pub Next: *const SINGLE_LIST_ENTRY,
 }
 
 
@@ -185,11 +185,11 @@ pub struct LDR_DATA_TABLE_ENTRY {
     pub TlsIndex: u16,
     pub HashLinks: LIST_ENTRY,
     pub TimeDateStamp: u32,
-    pub EntryPointActivationContext: *mut ACTIVATION_CONTEXT,
+    pub EntryPointActivationContext: *const ACTIVATION_CONTEXT,
     pub Lock: *const c_void,
-    pub DdagNode: *mut LDR_DDAG_NODE,
+    pub DdagNode: *const LDR_DDAG_NODE,
     pub NodeModuleLink: LIST_ENTRY,
-    pub LoadContext: *mut LDRP_LOAD_CONTEXT,
+    pub LoadContext: *const LDRP_LOAD_CONTEXT,
     pub ParentDllBase: *const c_void,
     pub SwitchBackContext: *const c_void,
     pub BaseAddressIndexNode: RTL_BALANCED_NODE,
@@ -276,7 +276,7 @@ pub enum LDR_DLL_LOAD_REASON {
 }
 
 
-// I geniunely have no idea
+// I genuinely have no idea what it's for
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LDR_HOT_PATCH_STATE {
@@ -295,7 +295,7 @@ pub enum LDR_HOT_PATCH_STATE {
 #[derive(Debug, Copy, Clone)]
 pub struct LDR_DDAG_NODE {
     pub Modules: LIST_ENTRY,
-    pub ServiceTagList: *mut LDR_SERVICE_TAG_RECORD,
+    pub ServiceTagList: *const LDR_SERVICE_TAG_RECORD,
     pub LoadCount: u32,
     pub LoadWhileUnloadingCount: u32,
     pub LowestLink: u32,
@@ -310,8 +310,8 @@ pub struct LDR_DDAG_NODE {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct LDR_SERVICE_TAG_RECORD {
-    pub Next: *mut LDR_SERVICE_TAG_RECORD,
-    pub ServiceTag: *mut u32,
+    pub Next: *const LDR_SERVICE_TAG_RECORD,
+    pub ServiceTag: *const u32,
 
 }
 
@@ -321,7 +321,7 @@ pub struct LDR_SERVICE_TAG_RECORD {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct LDRP_CSLIST {
-    pub Tail: *mut SINGLE_LIST_ENTRY,
+    pub Tail: *const SINGLE_LIST_ENTRY,
 }
 
 #[repr(C)]
@@ -380,7 +380,7 @@ pub struct RTL_USER_PROCESS_PARAMETERS {
     pub LoaderThreads: u32,
     pub RedirectionDllName: UNICODE_STRING,
     pub HeapPartitionName: UNICODE_STRING,
-    pub DefaultThreadpoolCpuSetMasks: *mut u64,
+    pub DefaultThreadpoolCpuSetMasks: *const u64,
     pub DefaultThreadpoolCpuSetMaskCount: u32,
     pub DefaultThreadpoolThreadMaximum: u32,
     pub HeapMemoryTypeMask: u32,
@@ -406,16 +406,16 @@ pub struct RTL_DRIVE_LETTER_CURDIR {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct RTL_BALANCED_NODE {
-    pub Children: [*mut RTL_BALANCED_NODE; 2],
+    pub Children: [*const RTL_BALANCED_NODE; 2],
     pub ParentValue: u64,
 }
 impl RTL_BALANCED_NODE {
     #[inline]
-    pub fn Left(&self) -> *mut RTL_BALANCED_NODE {
+    pub fn Left(&self) -> *const RTL_BALANCED_NODE {
         self.Children[0]
     }
     #[inline]
-    pub fn Right(&self) -> *mut RTL_BALANCED_NODE {
+    pub fn Right(&self) -> *const RTL_BALANCED_NODE {
         self.Children[1]
     }
 }
@@ -423,7 +423,7 @@ impl RTL_BALANCED_NODE {
 //------------------------------------------------------------------
 //
 //              Other useful data types
-//    I implemented some Traits to do incredible stuff, 
+//    I implemented some Traits to do incredible stuff
 //      like casting a string as a string
 //
 //------------------------------------------------------------------
@@ -445,7 +445,7 @@ pub struct CURDIR {
 #[derive(Debug, Copy, Clone)]
 pub struct ACTIVATION_CONTEXT {
     pub Modules: LIST_ENTRY,
-    pub ServiceTagList: *mut LDR_SERVICE_TAG_RECORD,
+    pub ServiceTagList: *const LDR_SERVICE_TAG_RECORD,
     pub LoadCount: u32,
     pub LoadWhileUnloadingCount: u32,
     pub LowestLink: u32,
@@ -457,18 +457,15 @@ pub struct ACTIVATION_CONTEXT {
 }
 
 
-///
-/// Ah Yes
-/// A structure to define a string, we really needed that
-///
+
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct UNICODE_STRING {
     pub Length: u16,
     pub MaximumLength: u16,
-    pub Buffer: *mut u16,
+    pub Buffer: *const u16,
 }
-// Gonna put a head sized hole in my desk after having to implement fmt::Display for a string
+// Gonna put a head sized hole in my desk after having to manually implement fmt::Display for a string
 impl fmt::Display for UNICODE_STRING {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let buffer = unsafe {
@@ -490,7 +487,7 @@ impl fmt::Debug for UNICODE_STRING {
 
 //
 // Signed 64-bits integer
-//
+// Can simply be replaced by a simple u64
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct LARGE_INTEGER {
@@ -513,7 +510,7 @@ impl fmt::Debug for LARGE_INTEGER {
 
 //
 // Unsigned 64bit integer
-//
+// Can simply be replaced by a simple u64
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub struct ULARGE_INTEGER {

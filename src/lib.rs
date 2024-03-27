@@ -38,16 +38,16 @@ pub mod exports;
 /// describe the modules loaded into the process's virtual address space.
 unsafe fn get_peb_address() -> Option<*const PEB> {
     #[inline(always)]
-    fn peb_pointer() -> *const u8 {
+    fn peb_pointer() -> *const PEB {
         #[cfg(target_arch = "x86")]
         unsafe {
-            let peb: *const u8;
+            let peb: *const PEB;
             asm!("mov eax, fs:[0x30]", out("eax") peb, options(nomem, nostack, preserves_flags));
             peb
         }
         #[cfg(target_arch = "x86_64")]
         unsafe {
-            let peb: *const u8;
+            let peb: *const PEB;
             asm!("mov rax, gs:[0x60]", out("rax") peb, options(nomem, nostack, preserves_flags));
             peb
         }
@@ -57,7 +57,7 @@ unsafe fn get_peb_address() -> Option<*const PEB> {
     if peb_pointer.is_null() {
         None
     } else {
-        Some(&*(peb_pointer as *const PEB))
+        Some(&*(peb_pointer))
     }
 }
 

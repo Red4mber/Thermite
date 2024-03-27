@@ -10,7 +10,6 @@
 ///////////////////////////////////////////////////////////
 
 
-use std::collections::HashMap;
 use std::ffi::CStr;
 use std::slice;
 
@@ -21,14 +20,18 @@ use crate::get_peb_address;
 
 
 /// Structure in which we will store a function found in the export table
-/// Will eventually move in it's own file, but it's not needed yet
 #[derive(Debug, Clone)]
-pub struct ExportedFunction {
+pub struct Export {
     pub name: String,
     pub address: *const u8,
     pub ordinal: u16,
 }
-
+/// Structure in which we will store a module's information
+#[derive(Debug, Clone)]
+pub struct Module {
+    pub name: String,
+    pub address: *const u8,
+}
 
 
 /// Gets the base address of a loaded module by its name.
@@ -50,13 +53,11 @@ pub struct ExportedFunction {
 ///
 /// # Example
 /// ```
-/// use thermite::exports::get_module_address;
 /// let module_name = "kernel32.dll";
-/// let result = unsafe { get_module_address(module_name) };
-/// match result {
+/// match unsafe { thermite::exports::get_module_address(module_name) } {
 ///     Ok(base_address) => println!("[^-^] Module base address: {:?}", base_address),
 ///     Err(error) => eprintln!("[TwT] Error: {:?}", error),
-/// }
+/// };
 /// ```
 pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, GetModuleAddressError> {
     // Get the address of the Process Environment Block (PEB)
@@ -94,20 +95,66 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, GetModu
     }
 }
 
-
-
-
-/// Parses the export directory of a PE (Portable Executable) file.
+/// Retrieves a list of all modules loaded in memory.
 ///
 /// This function takes a raw pointer to the base address of the loaded PE file and parses
-/// the export directory to retrieve the `IMAGE_EXPORT_DIRECTORY` structure and the associated
-/// arrays containing information about the exported functions.
+/// the export directory to retrieve information about all exported functions. The resulting
+/// mapping associates each function's ordinal number with a struct containing the function's
+/// name, address, and ordinal number.
+///
+/// # Safety
+///
+/// This function is unsafe because it dereferences raw pointers to read the list of loaded modules
+/// directly from the Process Environment Block.
+///
+/// # Returns
+///
+/// A `Result` containing a `Vector` that contains `Module`
+/// structs. Each `Module` struct contains the following fields:
+///
+/// * `name` - The name of the exported function (`String`).
+/// * `address` - The address of the exported function (`*const u8`).
+///
+/// If the function fails to read the Process Environment Block, the function returns a
+/// `GetModuleAddressError::PebError`.
+///
+/// # Examples
+///
+/// ```
+/// let all_modules = unsafe { thermite::exports::get_all_loaded_modules() }.unwrap();
+/// println!("[^-^] Loaded Modules : {:#?}", all_modules);
+/// ```
+pub unsafe fn get_all_loaded_modules() -> Result<Vec<Module>, GetModuleAddressError> {
+    let loader_info = (*get_peb_address().ok_or(GetModuleAddressError::PebError)?).Ldr;
+    let mut list_entry = (*loader_info).InMemoryOrderModuleList.Flink;
+    let last_module = (*loader_info).InMemoryOrderModuleList.Blink;
+    let mut loaded_modules: Vec<Module> = vec![];
+    loop {
+        let module_base: *const LDR_DATA_TABLE_ENTRY =
+            list_entry.byte_sub(0x10) as *const LDR_DATA_TABLE_ENTRY;
+
+        loaded_modules.push( Module {
+            name: (*module_base).BaseDllName.to_string(),
+            address: (*module_base).DllBase as *const u8,
+        });
+
+        if list_entry == last_module {
+            return Ok(loaded_modules);
+        }
+        list_entry = (*list_entry).Flink;
+    }
+}
+
+
+/// Private Function
+///
+/// Parses the export directory of a PE (Portable Executable) file.
 ///
 /// # Safety
 ///
 /// This function is unsafe because it dereferences raw pointers and relies on the correct
-/// structure of the PE file. It is the caller's responsibility to ensure that the provided
-/// base address points to a valid, loaded PE file.
+/// structure of the PE file. But that's okay as long as you're not stupid
+/// and pass the correct address as argument.
 ///
 /// # Arguments
 ///
@@ -127,23 +174,11 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, GetModu
 ///
 /// # Examples
 ///
-/// ```
-///  use std::ptr;
+/// Just go check-out `get_function_address` or `get_all_exported_functions` source code.
 ///
-///
-///  fn main() {
-///      use thermite::exports::parse_export_directory;
-///      let base_address: *const u8 = ptr::null();
-///      unsafe {
-///          let (export_dir, address_of_functions, address_of_name_ordinals, address_of_names) =
-///              parse_export_directory(base_address).unwrap();
-///          // Use the parsed export directory information
-///      }
-///  }
-/// ```
-pub unsafe fn parse_export_directory<'a>(
+unsafe fn parse_export_directory<'a>(
     base_address: *const u8,
-) -> Result<(IMAGE_EXPORT_DIRECTORY, &'static[u32], &'static[u16], &'static[u32]), GetFunctionAddressError> {
+) -> Result<(IMAGE_EXPORT_DIRECTORY, &'a[u32], &'a[u16], &'a[u32]), GetFunctionAddressError> {
     // Get the offset to the NT headers from the PE header
     let nt_offset = base_address.byte_offset(0x03c);
 
@@ -175,90 +210,6 @@ pub unsafe fn parse_export_directory<'a>(
 }
 
 
-/// Retrieves a mapping of all exported functions from a PE (Portable Executable) file.
-///
-/// This function takes a raw pointer to the base address of the loaded PE file and parses
-/// the export directory to retrieve information about all exported functions. The resulting
-/// mapping associates each function's ordinal number with a struct containing the function's
-/// name, address, and ordinal number.
-///
-/// # Safety
-///
-/// This function is unsafe because it dereferences raw pointers and relies on the correct
-/// structure of the PE file. It is the caller's responsibility to ensure that the provided
-/// base address points to a valid, loaded PE file.
-///
-/// # Arguments
-///
-/// * `base_address` - A raw pointer to the base address of the loaded PE file.
-///
-/// # Returns
-///
-/// A `Result` containing a `HashMap` that maps ordinal numbers (`u16`) to `ExportedFunction`
-/// structs. Each `ExportedFunction` struct contains the following fields:
-///
-/// * `name` - The name of the exported function (`String`).
-/// * `address` - The address of the exported function (`*const u8`).
-/// * `ordinal` - The ordinal number of the exported function (`u16`).
-///
-/// If the PE file is invalid or an error occurs during parsing, the function returns an
-/// appropriate `GetFunctionAddressError`.
-///
-/// # Examples
-///
-/// ```
-///  use std::collections::HashMap;
-///  use std::ptr;
-///
-///  fn main() {
-///      let module_address = unsafe { thermite::exports::get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
-///          eprintln!("[TwT] {:#?}", err);
-///          std::process::exit(1)
-///      });
-///      unsafe {
-///          let exported_functions = thermite::exports::get_all_exported_functions(module_address).unwrap();
-///          // Use the exported functions mapping
-///      }
-///  }
-/// ```
-pub unsafe fn get_all_exported_functions(
-    base_address: *const u8,
-) -> Result<HashMap<u16, ExportedFunction>, GetFunctionAddressError> {
-    let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
-        parse_export_directory(base_address)?;
-
-    let mut exported_functions = HashMap::new();
-
-    // We iterate over the list of names
-    for (i, name_addr) in address_of_names.iter().enumerate() {
-
-
-        // Then match over the result of CStr::from_ptr to capture eventual errors
-        match CStr::from_ptr((base_address as usize + *name_addr as usize) as *const i8).to_str() {
-            Ok(function_name) => {
-                // Get the address of the function
-                let rva = address_of_functions[address_of_name_ordinals[i] as usize];
-                let true_address = (base_address as usize + rva as usize) as *const u8;
-                // Add the function to the HashMap
-                exported_functions.insert(
-                    address_of_name_ordinals[i],
-                    ExportedFunction {
-                        name: function_name.to_owned(),
-                        address: true_address,
-                        ordinal: address_of_name_ordinals[i],
-                    }
-                );
-            },
-            Err(e) => {
-                return Err(GetFunctionAddressError::FunctionNameParsingError(e));
-            }
-        };
-    }
-    Ok(exported_functions)
-}
-
-
-
 /// Gets the address of a function by its name in a loaded module.
 ///
 /// # Arguments
@@ -280,21 +231,22 @@ pub unsafe fn get_all_exported_functions(
 /// # Example
 ///
 /// ```
-///  use thermite::exports::get_function_address;
-///  let module_name = "ntdll.dll";
-///  let function_name = "NtOpenProcess";
-///  let module_address = unsafe { thermite::exports::get_module_address(module_name) }.unwrap_or_else(|err| {
-///          eprintln!("[TwT] {:#?}", err);
-///          std::process::exit(1)
-///      });
-///      println!("[^-^] Module {:?} found at address : {:?}", module_name, module_address);
-///      println!("[^-^] Looking for function {:#x?}", function_name);
+/// use thermite::exports::{get_function_address, get_module_address};
 ///
-///      let result = unsafe { get_function_address(function_name, module_address) };
-///      match result {
-///          Ok(function_address) => println!("[^o^] Function address: {:?}", function_address),
-///          Err(error) => eprintln!("[TwT] {:?}", error),
-///      }
+/// let module_name = "ntdll.dll";
+/// let function_name = "NtOpenProcess";
+/// let module_address = unsafe { get_module_address(module_name) }.unwrap_or_else(|err| {
+///     eprintln!("[TwT] {:#?}", err);
+///     std::process::exit(1)
+/// });
+/// println!("[^-^] Module {:?} found at address : {:?}", module_name, module_address);
+/// println!("[^-^] Looking for function {:#x?}", function_name);
+///
+/// let result = unsafe { get_function_address(function_name, module_address) };
+/// match result {
+///     Ok(function_address) => println!("[^o^] Function address: {:?}", function_address),
+///     Err(error) => eprintln!("[TwT] {:?}", error),
+/// }
 /// ```
 pub unsafe fn get_function_address(
     function_name: &str,
@@ -324,6 +276,95 @@ pub unsafe fn get_function_address(
         };
     }
     Err(GetFunctionAddressError::FunctionNotFound)
+}
+
+
+
+/// Retrieves a list of all exported functions from a loaded DLL.
+///
+/// This function takes a raw pointer to the base address of the loaded DLL and parses
+/// the export directory to retrieve information about all exported functions. The resulting
+/// vector contains structures, each containing the function's name, address, and ordinal number.
+///
+/// # Safety
+///
+/// This function is unsafe because it dereferences raw pointers and relies on the correct
+/// structure of the PE file. It is the caller's responsibility to ensure that the provided
+/// base address points to a valid, loaded PE file.
+///
+/// # Arguments
+///
+/// * `base_address` - A raw pointer to the base address of the loaded PE file.
+///
+/// # Returns
+///
+/// A `Result` containing a `Vector` that contains `ExportedFunction`
+/// structs. Each `ExportedFunction` struct contains the following fields:
+///
+/// * `name` - The name of the exported function (`String`).
+/// * `address` - The address of the exported function (`*const u8`).
+/// * `ordinal` - The ordinal number of the exported function (`u16`).
+///
+/// If the PE file is invalid or an error occurs during parsing, the function returns an
+/// appropriate `GetFunctionAddressError`.
+///
+/// # Examples
+///
+/// ```
+/// use std::collections::HashMap;
+/// use std::ptr;
+///
+/// fn main() {
+///     // Get the address of a loaded DLL
+///     let module_address = unsafe { thermite::exports::get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
+///         eprintln!("[TwT] {:#?}", err);
+///         std::process::exit(1)
+///     });
+///     unsafe {
+///         let exported_functions = thermite::exports::get_all_exported_functions(module_address).unwrap();
+///         // Use the exported functions mapping
+///     }
+/// }
+/// ```
+pub unsafe fn get_all_exported_functions(
+    base_address: *const u8,
+) -> Result<Vec<Export>, GetFunctionAddressError> {
+    let (
+        _,
+        address_of_functions,
+        address_of_name_ordinals,
+        address_of_names
+    ) =
+        parse_export_directory(base_address)?;
+
+    let mut exported_functions = Vec::new();
+
+    // We iterate over the list of names
+    for (i, name_addr) in address_of_names.iter().enumerate() {
+
+
+        // Then match over the result of CStr::from_ptr to capture eventual errors
+        match CStr::from_ptr((base_address as usize + *name_addr as usize) as *const i8).to_str() {
+            Ok(function_name) => {
+                // Get the address of the function
+                let rva = address_of_functions[address_of_name_ordinals[i] as usize];
+                let true_address = (base_address as usize + rva as usize) as *const u8;
+                // Add the function to the HashMap
+                exported_functions.push(
+                    // address_of_name_ordinals[i] as usize,
+                    Export {
+                        name: function_name.to_owned(),
+                        address: true_address,
+                        ordinal: address_of_name_ordinals[i],
+                    }
+                );
+            },
+            Err(e) => {
+                return Err(GetFunctionAddressError::FunctionNameParsingError(e));
+            }
+        };
+    }
+    Ok(exported_functions)
 }
 
 
