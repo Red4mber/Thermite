@@ -19,11 +19,9 @@ features as I learn new things.
 
 Feel free to browse the code, I took care to document absolutely everything, so it shouldn't be that hard to understand.
 
-## Usage
-
 ## Why rust ?
 
-¯\_(ツ)_/¯ I just think its neat
+I just think its neat
 
 As previously stated, I wanted to learn new things so why not try something else than the usual C/C++ maldev projects.
 
