@@ -1,12 +1,7 @@
 ///////////////////////////////////////////////////////////
 //
 //        == DLL Export Table Parsing Functions ==
-//          -- For Thermite: Offensive Rust --
 //
-//    Does all kinds of stuff, but mostly just to recover
-//            Functions exported by DLLs
-//
-//          Made by RedAmber - 27 March 2024
 ///////////////////////////////////////////////////////////
 
 
@@ -15,7 +10,7 @@ use std::slice;
 
 use crate::model::peb_teb::LDR_DATA_TABLE_ENTRY;
 use crate::model::pe_file_format::{IMAGE_EXPORT_DIRECTORY, IMAGE_NT_HEADERS, IMAGE_NT_SIGNATURE};
-use crate::error::{GetModuleAddressError, GetFunctionAddressError};
+use crate::error::DllParserError;
 use crate::get_peb_address;
 
 
@@ -54,14 +49,14 @@ pub struct Module {
 /// # Example
 /// ```
 /// let module_name = "kernel32.dll";
-/// match unsafe { thermite::exports::get_module_address(module_name) } {
+/// match unsafe { thermite::dll_parser::get_module_address(module_name) } {
 ///     Ok(base_address) => println!("[^-^] Module base address: {:?}", base_address),
 ///     Err(error) => eprintln!("[TwT] Error: {:?}", error),
 /// };
 /// ```
-pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, GetModuleAddressError> {
+pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllParserError> {
     // Get the address of the Process Environment Block (PEB)
-    let peb = get_peb_address().ok_or(GetModuleAddressError::PebError)?;
+    let peb = get_peb_address().ok_or(DllParserError::PebError)?;
 
     // Get a reference to the PEB 's Loader Data
     let ldr = (*peb).Ldr;
@@ -73,7 +68,7 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, GetModu
     loop {
         // If we've reached the end of the list, the module was not found
         if list_entry == last_module {
-            return Err(GetModuleAddressError::ModuleNotFound);
+            return Err(DllParserError::ModuleNotFound);
         }
 
         // Get a reference to the current module's LDR_DATA_TABLE_ENTRY
@@ -121,11 +116,11 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, GetModu
 /// # Examples
 ///
 /// ```
-/// let all_modules = unsafe { thermite::exports::get_all_loaded_modules() }.unwrap();
+/// let all_modules = unsafe { thermite::dll_parser::get_all_loaded_modules() }.unwrap();
 /// println!("[^-^] Loaded Modules : {:#?}", all_modules);
 /// ```
-pub unsafe fn get_all_loaded_modules() -> Result<Vec<Module>, GetModuleAddressError> {
-    let loader_info = (*get_peb_address().ok_or(GetModuleAddressError::PebError)?).Ldr;
+pub unsafe fn get_all_loaded_modules() -> Result<Vec<Module>, DllParserError> {
+    let loader_info = (*get_peb_address().ok_or(DllParserError::PebError)?).Ldr;
     let mut list_entry = (*loader_info).InMemoryOrderModuleList.Flink;
     let last_module = (*loader_info).InMemoryOrderModuleList.Blink;
     let mut loaded_modules: Vec<Module> = vec![];
@@ -178,14 +173,14 @@ pub unsafe fn get_all_loaded_modules() -> Result<Vec<Module>, GetModuleAddressEr
 ///
 unsafe fn parse_export_directory<'a>(
     base_address: *const u8,
-) -> Result<(IMAGE_EXPORT_DIRECTORY, &'a[u32], &'a[u16], &'a[u32]), GetFunctionAddressError> {
+) -> Result<(IMAGE_EXPORT_DIRECTORY, &'a[u32], &'a[u16], &'a[u32]), DllParserError> {
     // Get the offset to the NT headers from the PE header
     let nt_offset = base_address.byte_offset(0x03c);
 
     // Get a reference to the NT headers and check the signature
     let nt_header: &IMAGE_NT_HEADERS = &base_address.byte_offset(*nt_offset as isize).cast::<IMAGE_NT_HEADERS>().read();
     if nt_header.Signature != IMAGE_NT_SIGNATURE {
-        return Err(GetFunctionAddressError::PEParsingError);
+        return Err(DllParserError::PEParsingError);
     }
 
     // Get a reference to the export directory
@@ -231,7 +226,7 @@ unsafe fn parse_export_directory<'a>(
 /// # Example
 ///
 /// ```
-/// use thermite::exports::{get_function_address, get_module_address};
+/// use thermite::dll_parser::{get_function_address, get_module_address};
 ///
 /// let module_name = "ntdll.dll";
 /// let function_name = "NtOpenProcess";
@@ -251,12 +246,12 @@ unsafe fn parse_export_directory<'a>(
 pub unsafe fn get_function_address(
     function_name: &str,
     base_address: *const u8,
-) -> Result<*const u8, GetFunctionAddressError> {
+) -> Result<*const u8, DllParserError> {
 
     let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
         parse_export_directory(base_address)?;
 
-    // We're searching by name so we iterate over the list of names
+    // We're searching by name, so we iterate over the list of names
     for (i, name_addr) in address_of_names.iter().enumerate() {
         // Then match over the result of CStr::from_ptr to capture eventual errors
         match CStr::from_ptr((base_address as usize + *name_addr as usize) as *const i8).to_str() {
@@ -271,11 +266,11 @@ pub unsafe fn get_function_address(
             },
             // If we captured an error, we return it to the caller via our own error type
             Err(e) => {
-                return Err(GetFunctionAddressError::FunctionNameParsingError(e));
+                return Err(DllParserError::FunctionNameParsingError(e));
             }
         };
     }
-    Err(GetFunctionAddressError::FunctionNotFound)
+    Err(DllParserError::FunctionNotFound)
 }
 
 
@@ -316,19 +311,19 @@ pub unsafe fn get_function_address(
 ///
 /// fn main() {
 ///     // Get the address of a loaded DLL
-///     let module_address = unsafe { thermite::exports::get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
+///     let module_address = unsafe { thermite::dll_parser::get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
 ///         eprintln!("[TwT] {:#?}", err);
 ///         std::process::exit(1)
 ///     });
 ///     unsafe {
-///         let exported_functions = thermite::exports::get_all_exported_functions(module_address).unwrap();
+///         let exported_functions = thermite::dll_parser::get_all_exported_functions(module_address).unwrap();
 ///         // Use the exported functions mapping
 ///     }
 /// }
 /// ```
 pub unsafe fn get_all_exported_functions(
     base_address: *const u8,
-) -> Result<Vec<Export>, GetFunctionAddressError> {
+) -> Result<Vec<Export>, DllParserError> {
     let (
         _,
         address_of_functions,
@@ -360,7 +355,7 @@ pub unsafe fn get_all_exported_functions(
                 );
             },
             Err(e) => {
-                return Err(GetFunctionAddressError::FunctionNameParsingError(e));
+                return Err(DllParserError::FunctionNameParsingError(e));
             }
         };
     }

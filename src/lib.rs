@@ -1,7 +1,7 @@
-#![feature(pointer_byte_offsets)] // I should find a way to do without
+#![feature(pointer_byte_offsets)]
+#![feature(iter_advance_by)] // I should find a way to do without
 ///////////////////////////////////////////////////////////
 //
-//             -- Thermite: Offensive Rust --
 //                   Main Library File
 //
 //          Made by RedAmber - 27 March 2024
@@ -12,7 +12,9 @@ use crate::model::peb_teb::PEB;
 
 pub mod model;
 pub mod error;
-pub mod exports;
+pub mod dll_parser;
+
+pub mod syscalls;
 
 
 /// Helper function to get the address of the Process Environment Block (PEB).

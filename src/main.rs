@@ -1,6 +1,7 @@
+#![allow(unused)]
 
 
-use thermite::exports::{get_module_address, get_function_address, get_all_exported_functions, Export, get_all_loaded_modules};
+use thermite::dll_parser::{get_module_address, get_function_address, get_all_exported_functions, Export, get_all_loaded_modules};
 
 
 fn main() {
@@ -8,10 +9,27 @@ fn main() {
 
     // example_all_exports();
 
-    let all_modules = unsafe { get_all_loaded_modules() }.unwrap();
-    println!("[^-^] Loaded Modules : {:#?}", all_modules);
+    // let all_modules = unsafe { get_all_loaded_modules() }.unwrap();
+    // println!("[^-^] Loaded Modules : {:#?}", all_modules);
+
+    // let SSNs = unsafe{ thermite::syscalls::get_all_ssn() };
+    // println!("[^-^] {:#x?}", SSNs);
+
+    let syscall_name = "NtOpenProcess";
+    match unsafe{ thermite::syscalls::simple_get_ssn(syscall_name) } {
+        Ok(ssn) => {
+            println!("[^-^] {syscall_name} SSN Found {:#x?}", ssn);
+        },
+        Err(err) => {
+            println!("[TwT] {syscall_name} : {err}");
+        }
+    };
 }
 
+
+// Below are testing / example functions
+// I will move them eventually but i'm still working on it
+//
 fn example_all_exports() {
     let mut exported_functions: Vec<Export>;
     let module_address = unsafe { get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
@@ -44,8 +62,6 @@ fn example_all_exports() {
 
     println!("[^-^] {:#?}", nt_functions);
 }
-
-
 
 fn example_get_function_address(module_name: &str, function_name: &str) {
     let module_address = unsafe { get_module_address(module_name) }.unwrap_or_else(|err| {

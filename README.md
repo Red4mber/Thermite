@@ -1,29 +1,37 @@
 # Thermite: Offensive Rust
 
-## A Rust Malware development and EDR/AV Evasion Learning Project
+## A Rust Malware development Learning Project
 
 This is a **learning project** aimed at exploring advanced topics in Windows internals, malware development and EDR/AV
 evasion techniques. It is written entirely in Rust and so far does not any dependencies at all.
 
+I do not have any ambition for this project to become a game-breaking tool for red-teams or a high take research project
+pushing the limits of EDRs, I just do it for the joy of it and to learn cool tricks, I don't even know why you're
+reading this to be honest
+
 ## Features
 
 Well, so far not much ^-^"
-But it's the very start of this project.
+But it's been a week since I started coding, so chill out, it won't be ready soon.
 
-I already reimplemented an equivalent of `GetModuleHandle()` and `GetProcAddress()` as well as all the structures needed
-to make it work (and a bit more even).
+I finished working on parsing loaded DLLs in memory to extract export function, then wrote a (very)basic function to
+dynamically retrieve Syscall numbers.
+The assembly part is done, so you should be able to use it to make direct syscalls, but I still need to work on it a
+little, mostly to clean it up.
 
-I'm now working on dynamically retrieving syscalls SSNs, so that i can put all pieces together.
-This project is kinda like my journal of learning about malware, i plan to keep on building on it and adding more
-features as I learn new things.
+I'll probably work on indirect syscalls next, as it seems like the logical thing to do, but I don't plan much, so far I've been completely winging it, and the result is pretty fine.
 
-Feel free to browse the code, I took care to document absolutely everything, so it shouldn't be that hard to understand.
+Feel free to browse the code, I took care to document absolutely everything and wrote detailed documentation for every
+function so far.
 
-## Why rust ?
+I learned a lot while making this, maybe you too, who knows ?
+Knowledge is meant to be shared <3
 
-I just think its neat
+### Why rust ?
 
-As previously stated, I wanted to learn new things so why not try something else than the usual C/C++ maldev projects.
+I just think its neat.
+
+I admit that it doesn't make it easy, but that exactly what makes learning a new thing fun, so why not ?
 
 ## License
 
@@ -32,5 +40,3 @@ Nah, just take it
 ## (obligatory) Disclaimer
 
 Just don't be evil.
-This may be a malware development project, the primary goal is to understand the workings of windows internals and learn
-various evasion techniques, not to attack anything.

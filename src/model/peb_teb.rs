@@ -465,7 +465,9 @@ pub struct UNICODE_STRING {
     pub MaximumLength: u16,
     pub Buffer: *const u16,
 }
-// Gonna put a head sized hole in my desk after having to manually implement fmt::Display for a string
+//
+// I swear i'm gonna put a head sized hole in my desk after
+// having to manually implement fmt::Display and Debug for a ********* string
 impl fmt::Display for UNICODE_STRING {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let buffer = unsafe {
@@ -533,7 +535,3 @@ impl fmt::Debug for ULARGE_INTEGER {
 }
 
 
-//
-// TODO 
-// - Implement tests for structure size and offsets
-// - Implement NYI structures
