@@ -1,7 +1,7 @@
+use crate::dll_parser::{get_all_exported_functions, get_module_address, Export};
+use crate::error::DllParserError;
 use std::arch::global_asm;
 use std::ptr;
-use crate::dll_parser::{Export, get_all_exported_functions, get_module_address};
-use crate::error::{DllParserError};
 
 #[derive(Debug, Clone)]
 pub struct Syscall {
@@ -41,7 +41,8 @@ It took me a whole day just to figure out how it worked, so now I'm leaving comm
 
 Block comments can be folded on most editors, so there's nothing to lose
 */
-global_asm!(r#"
+global_asm!(
+    r#"
 .global syscall_handler
 .section .text
 
@@ -70,8 +71,8 @@ execute:
     mov rsi, [rsp - 0x8]        // Restore value of RSI
     mov rdi, [rsp - 0x10]       // Restore value of RDI
     ret                         // Return
-"#);
-
+"#
+);
 
 #[allow(unused)]
 extern "C" {
@@ -81,19 +82,10 @@ extern "C" {
     ///  - `ssn` : An integer, the System Service Number of the syscall you want to call
     ///  - `n_args`: An integer, refers to the count of arguments to pass to syscall (excluding these two, which are not passed to syscall)
     ///  - ...  -> Then, every argument to pass to the syscall instruction.
-    fn syscall_handler(
-        ssn: u16,
-        n_args: u32,
-        ...
-    ) -> i32;
+    pub fn syscall_handler(ssn: u16, n_args: u32, ...) -> i32;
 }
 
 // TODO: Macro wrapper around the syscall handler
-
-
-
-
-
 
 /// Simply retrieves the 4th byte of the function, if the 3rd is a MOV EAX, <???> instruction.
 /// If it's not, simply returns None
@@ -109,11 +101,11 @@ pub fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
     unsafe {
         if ptr::read(syscall_addr.add(3)) == 0xB8 {
             Some(ptr::read(syscall_addr.add(4)) as u16)
-        } else { None }
+        } else {
+            None
+        }
     }
 }
-
-
 
 /// Searches for every syscalls using the provided pattern
 /// It then executes the find_ssn function on every one of them to retrieve their syscall numbers
@@ -135,26 +127,20 @@ pub fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
 /// ```
 pub fn search(
     pattern: fn(&&Export) -> bool,
-    find_ssn: fn(*const u8) -> Option<u16>
-) -> Result<Vec<Syscall>,DllParserError> {
+    find_ssn: fn(*const u8) -> Option<u16>,
+) -> Result<Vec<Syscall>, DllParserError> {
     let ntdll_handle = unsafe { get_module_address("ntdll.dll") }?;
 
     let ssns = unsafe { get_all_exported_functions(ntdll_handle) }?
         .iter()
         .filter(pattern)
         .filter_map(|x| {
-            find_ssn(x.address)
-            .map(|ssn| {
-                Syscall {
-                    name: x.name.clone(),
-                    address: x.address,
-                    ssn
-                }
+            find_ssn(x.address).map(|ssn| Syscall {
+                name: x.name.clone(),
+                address: x.address,
+                ssn,
             })
         })
         .collect();
-    return Ok(ssns)
+    return Ok(ssns);
 }
-
-// TODO : Document this module properly
-// Not just with random-ass comments

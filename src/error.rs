@@ -20,7 +20,9 @@ impl fmt::Display for DllParserError {
         match self {
             Self::PebError => write!(f, "Invalid PEB pointer"),
             Self::FunctionNotFound => write!(f, "The requested function was not found"),
-            Self::FunctionNameParsingError(err) => write!(f, "Failed to parse function name : {err}"),
+            Self::FunctionNameParsingError(err) => {
+                write!(f, "Failed to parse function name : {err}")
+            }
             Self::InvalidNtHeader => write!(f, "Failed to parse module: Invalid NT Signature"),
             Self::ModuleNotFound => write!(f, "The requested module was not found"),
         }
@@ -38,7 +40,7 @@ pub enum SyscallError {
 impl fmt::Display for SyscallError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::SSNNotFound => write!(f, "The requested System Service Number was not found")
+            Self::SSNNotFound => write!(f, "The requested System Service Number was not found"),
         }
     }
 }
@@ -58,7 +60,6 @@ impl fmt::Display for ThermiteError {
             Self::SyscallError(err) => write!(f, "{}", err.to_string()),
         }
     }
-
 }
 impl fmt::Debug for ThermiteError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

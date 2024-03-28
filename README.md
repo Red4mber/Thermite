@@ -37,6 +37,6 @@ I admit that it doesn't make it easy, but that exactly what makes learning a new
 
 Nah, just take it
 
-## (obligatory) Disclaimer
+## Disclaimer
 
 Just don't be evil.

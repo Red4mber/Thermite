@@ -4,15 +4,15 @@
 //
 ///////////////////////////////////////////////////////////
 
-
 use std::ffi::CStr;
 use std::slice;
 
-use crate::model::windows::peb_teb::LDR_DATA_TABLE_ENTRY;
-use crate::model::windows::pe_file_format::{IMAGE_EXPORT_DIRECTORY, IMAGE_NT_HEADERS, IMAGE_NT_SIGNATURE};
 use crate::error::DllParserError;
 use crate::get_peb_address;
-
+use crate::model::windows::pe_file_format::{
+    IMAGE_EXPORT_DIRECTORY, IMAGE_NT_HEADERS, IMAGE_NT_SIGNATURE,
+};
+use crate::model::windows::peb_teb::LDR_DATA_TABLE_ENTRY;
 
 /// Structure in which we will store a function found in the export table
 #[derive(Debug, Clone)]
@@ -27,7 +27,6 @@ pub struct Module {
     pub name: String,
     pub address: *const u8,
 }
-
 
 /// Gets the base address of a loaded module by its name.
 ///
@@ -129,7 +128,7 @@ pub unsafe fn get_all_loaded_modules() -> Result<Vec<Module>, DllParserError> {
         let module_base: *const LDR_DATA_TABLE_ENTRY =
             list_entry.byte_sub(0x10) as *const LDR_DATA_TABLE_ENTRY;
 
-        loaded_modules.push( Module {
+        loaded_modules.push(Module {
             name: (*module_base).BaseDllName.to_string(),
             address: (*module_base).DllBase as *const u8,
         });
@@ -140,8 +139,6 @@ pub unsafe fn get_all_loaded_modules() -> Result<Vec<Module>, DllParserError> {
         list_entry = (*list_entry).Flink;
     }
 }
-
-
 
 /// #### Private Function
 /// # Safety
@@ -170,37 +167,51 @@ pub unsafe fn get_all_loaded_modules() -> Result<Vec<Module>, DllParserError> {
 ///
 unsafe fn parse_export_directory<'a>(
     base_address: *const u8,
-) -> Result<(IMAGE_EXPORT_DIRECTORY, &'a[u32], &'a[u16], &'a[u32]), DllParserError> {
+) -> Result<(IMAGE_EXPORT_DIRECTORY, &'a [u32], &'a [u16], &'a [u32]), DllParserError> {
     // Get the offset to the NT headers from the PE header
     let nt_offset = base_address.byte_offset(0x03c);
 
     // Get a reference to the NT headers and check the signature
-    let nt_header: &IMAGE_NT_HEADERS = &base_address.byte_offset(*nt_offset as isize).cast::<IMAGE_NT_HEADERS>().read();
+    let nt_header: &IMAGE_NT_HEADERS = &base_address
+        .byte_offset(*nt_offset as isize)
+        .cast::<IMAGE_NT_HEADERS>()
+        .read();
     if nt_header.Signature != IMAGE_NT_SIGNATURE {
         return Err(DllParserError::InvalidNtHeader);
     }
 
     // Get a reference to the export directory
-    let export_dir: IMAGE_EXPORT_DIRECTORY = base_address.offset(
-        nt_header.OptionalHeader.DataDirectory[0].VirtualAddress as isize
-    ).cast::<IMAGE_EXPORT_DIRECTORY>().read();
+    let export_dir: IMAGE_EXPORT_DIRECTORY = base_address
+        .offset(nt_header.OptionalHeader.DataDirectory[0].VirtualAddress as isize)
+        .cast::<IMAGE_EXPORT_DIRECTORY>()
+        .read();
 
     let address_of_functions: &[u32] = slice::from_raw_parts(
-        base_address.byte_offset(export_dir.AddressOfFunctions as isize).cast::<u32>(),
+        base_address
+            .byte_offset(export_dir.AddressOfFunctions as isize)
+            .cast::<u32>(),
         export_dir.NumberOfFunctions as usize,
     );
     let address_of_name_ordinals: &[u16] = slice::from_raw_parts(
-        base_address.byte_offset(export_dir.AddressOfNameOrdinals as isize).cast::<u16>(),
+        base_address
+            .byte_offset(export_dir.AddressOfNameOrdinals as isize)
+            .cast::<u16>(),
         export_dir.NumberOfNames as usize,
     );
     let address_of_names: &[u32] = slice::from_raw_parts(
-        base_address.byte_offset(export_dir.AddressOfNames as isize).cast::<u32>(),
+        base_address
+            .byte_offset(export_dir.AddressOfNames as isize)
+            .cast::<u32>(),
         export_dir.NumberOfNames as usize,
     );
 
-    Ok((export_dir, address_of_functions, address_of_name_ordinals, address_of_names))
+    Ok((
+        export_dir,
+        address_of_functions,
+        address_of_name_ordinals,
+        address_of_names,
+    ))
 }
-
 
 /// Finds the address of a function by its name in the export table of a loaded module.
 ///
@@ -237,7 +248,6 @@ pub unsafe fn get_function_address(
     function_name: &str,
     base_address: *const u8,
 ) -> Result<*const u8, DllParserError> {
-
     let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
         parse_export_directory(base_address)?;
 
@@ -253,7 +263,7 @@ pub unsafe fn get_function_address(
                     let true_address = (base_address as usize + rva as usize) as *const u8;
                     return Ok(true_address);
                 }
-            },
+            }
             // If we captured an error, we forward it to the caller with our own error type
             Err(e) => {
                 return Err(DllParserError::FunctionNameParsingError(e));
@@ -262,8 +272,6 @@ pub unsafe fn get_function_address(
     }
     Err(DllParserError::FunctionNotFound)
 }
-
-
 
 /// Retrieves a list of all exported functions from a loaded DLL.
 ///
@@ -307,20 +315,13 @@ pub unsafe fn get_function_address(
 pub unsafe fn get_all_exported_functions(
     base_address: *const u8,
 ) -> Result<Vec<Export>, DllParserError> {
-    let (
-        _,
-        address_of_functions,
-        address_of_name_ordinals,
-        address_of_names
-    ) =
+    let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
         parse_export_directory(base_address)?;
 
     let mut exported_functions = Vec::new();
 
     // We iterate over the list of names
     for (i, name_addr) in address_of_names.iter().enumerate() {
-
-
         // Then match over the result of CStr::from_ptr to capture eventual errors
         match CStr::from_ptr((base_address as usize + *name_addr as usize) as *const i8).to_str() {
             Ok(function_name) => {
@@ -334,9 +335,9 @@ pub unsafe fn get_all_exported_functions(
                         name: function_name.to_owned(),
                         address: true_address,
                         ordinal: address_of_name_ordinals[i],
-                    }
+                    },
                 );
-            },
+            }
             Err(e) => {
                 return Err(DllParserError::FunctionNameParsingError(e));
             }
@@ -344,5 +345,3 @@ pub unsafe fn get_all_exported_functions(
     }
     Ok(exported_functions)
 }
-
-

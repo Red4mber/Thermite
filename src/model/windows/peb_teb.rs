@@ -9,8 +9,6 @@ use std::fmt;
 /// Why do I do that to myself ?
 ///
 
-
-
 //------------------------------------------------------------------
 //
 //              Process Environment Block
@@ -18,10 +16,10 @@ use std::fmt;
 //------------------------------------------------------------------
 ///
 /// Structure containing all User-Mode parameters associated by system with current process.
-/// The Process Environment Block (PEB) is a process’s user-mode representation. 
-/// 
-/// It has the highest-level knowledge of a process in kernel mode and the lowest-level in user mode. 
-/// The PEB is created by the kernel but is mostly operated on from user mode. 
+/// The Process Environment Block (PEB) is a process’s user-mode representation.
+///
+/// It has the highest-level knowledge of a process in kernel mode and the lowest-level in user mode.
+/// The PEB is created by the kernel but is mostly operated on from user mode.
 /// If a (system) process has no user-mode footprint, it has no PEB.
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -37,7 +35,7 @@ pub struct PEB {
     pub ProcessParameters: *const RTL_USER_PROCESS_PARAMETERS,
     pub SubSystemData: *const c_void,
     pub ProcessHeap: *const c_void,
-    pub FastPebLock: *const c_void, // _RTL_CRITICAL_SECTION NYI
+    pub FastPebLock: *const c_void,      // _RTL_CRITICAL_SECTION NYI
     pub AtlThunkSListPtr: *const c_void, // _SLIST_HEADER NYI
     pub IFEOKey: *const c_void,
     pub CrossProcessFlags: u32, // Bitfield here
@@ -121,17 +119,17 @@ pub struct PEB {
     pub CloudFileDiagFlags: u32,
     pub PlaceholderCompatibilityMode: u8,
     pub PlaceholderCompatibilityModeReserved: [u8; 7],
-    pub LeapSecondData: *const c_void,    // _LEAP_SECOND_DATA NYI
+    pub LeapSecondData: *const c_void, // _LEAP_SECOND_DATA NYI
     pub LeapSecondFlags: u32,
     pub NtGlobalFlag2: u32,
     pub ExtendedFeatureDisableMask: u64,
 }
 
 ///
-/// The PEB_LDR_DATA structure is the defining record of which user-mode modules are loaded in a process. 
-/// It is essentially the head of three double-linked lists of LDR_DATA_TABLE_ENTRY structures. 
-/// Each structure represents one loaded module. Each list links through the structures in a different order. 
-/// 
+/// The PEB_LDR_DATA structure is the defining record of which user-mode modules are loaded in a process.
+/// It is essentially the head of three double-linked lists of LDR_DATA_TABLE_ENTRY structures.
+/// Each structure represents one loaded module. Each list links through the structures in a different order.
+///
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct PEB_LDR_DATA {
@@ -162,8 +160,7 @@ pub struct SINGLE_LIST_ENTRY {
     pub Next: *const SINGLE_LIST_ENTRY,
 }
 
-
-/// The LDR_DATA_TABLE_ENTRY structure is NTDLL’s record of how a DLL is loaded into a process. 
+/// The LDR_DATA_TABLE_ENTRY structure is NTDLL’s record of how a DLL is loaded into a process.
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct LDR_DATA_TABLE_ENTRY {
@@ -202,7 +199,7 @@ pub struct LDR_DATA_TABLE_ENTRY {
     pub HotPatchState: LDR_HOT_PATCH_STATE,
 }
 
-// The implementation is still a bit fucked up, 
+// The implementation is still a bit fucked up,
 // IDK how to properly do C-Style unions in rust
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -210,7 +207,7 @@ pub union _KernelCallbackTable {
     pub KernelCallbackTable: *const c_void,
     pub UserSharedInfoPtr: *const c_void,
 }
-// I hate to write this because 
+// I hate to write this because
 // Debug can't be derived from unions x_X
 impl fmt::Debug for _KernelCallbackTable {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -224,9 +221,9 @@ impl fmt::Debug for _KernelCallbackTable {
 }
 
 //
-// DLL LOADER ENUMS 
-// and Types  
-// 
+// DLL LOADER ENUMS
+// and Types
+//
 /////////////////////////////////////////
 
 /// State of the module loader
@@ -253,7 +250,7 @@ pub enum LDR_DDAG_STATE {
 
 /// Self explanatory
 /// Reason why the DLL is loaded
-/// Only found in LDR_DATA_TABLE_ENTRY. 
+/// Only found in LDR_DATA_TABLE_ENTRY.
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum LDR_DLL_LOAD_REASON {
@@ -270,7 +267,6 @@ pub enum LDR_DLL_LOAD_REASON {
     LoadReasonUnknown = -1,
 }
 
-
 // I genuinely have no idea what it's for
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -285,7 +281,7 @@ pub enum LDR_HOT_PATCH_STATE {
 
 ///
 /// Extends the LDR_DATA_TABLE_ENTRY that represents a loaded module.
-/// 
+///
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct LDR_DDAG_NODE {
@@ -301,17 +297,15 @@ pub struct LDR_DDAG_NODE {
     pub PreorderNumber: u32,
 }
 
-
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct LDR_SERVICE_TAG_RECORD {
     pub Next: *const LDR_SERVICE_TAG_RECORD,
     pub ServiceTag: *const u32,
-
 }
 
 //
-//  
+//
 //
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -326,16 +320,15 @@ pub struct LDRP_LOAD_CONTEXT {}
 //============================================================================
 //
 //              === Run Time Libraries structures ===
-// 
+//
 //
 //=============================================================================
 
-
 ///
 /// Low-level packaging of the numerous arguments and parameters
-/// that can be specified to such Win32 API functions as CreateProcess 
-/// for the transition to and from kernel mode. 
-/// 
+/// that can be specified to such Win32 API functions as CreateProcess
+/// for the transition to and from kernel mode.
+///
 /// Stores the input to the RtlCreateUserProcess function.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -382,11 +375,11 @@ pub struct RTL_USER_PROCESS_PARAMETERS {
 }
 
 /// From Geoff Chappell:
-/// 
+///
 /// "small structure that is presently thought to be
 ///  defined in all Windows versions but not used in any."
-/// 
-///  Peak Microsoft 
+///
+///  Peak Microsoft
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct RTL_DRIVE_LETTER_CURDIR {
@@ -396,7 +389,7 @@ pub struct RTL_DRIVE_LETTER_CURDIR {
     pub DosPath: UNICODE_STRING,
 }
 
-/// Designed to be nested within another structure to allow 
+/// Designed to be nested within another structure to allow
 /// the other structure can be the node of a binary search tree
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -424,8 +417,8 @@ impl RTL_BALANCED_NODE {
 //------------------------------------------------------------------
 
 ///
-/// 
-/// 
+///
+///
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct CURDIR {
@@ -434,8 +427,8 @@ pub struct CURDIR {
 }
 
 ///
-/// 
-/// 
+///
+///
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct ACTIVATION_CONTEXT {
@@ -450,8 +443,6 @@ pub struct ACTIVATION_CONTEXT {
     pub CondenseLink: SINGLE_LIST_ENTRY,
     pub PreorderNumber: u32,
 }
-
-
 
 #[repr(C)]
 #[derive(Copy, Clone)]
@@ -528,5 +519,3 @@ impl fmt::Debug for ULARGE_INTEGER {
         fmt::Display::fmt(self, f)
     }
 }
-
-

@@ -1,14 +1,12 @@
-#![feature(pointer_byte_offsets)]
 
-use std::arch::asm;
 use crate::model::windows::peb_teb::PEB;
+use std::arch::asm;
 
-pub mod model;
-pub mod error;
 pub mod dll_parser;
+pub mod error;
+pub mod model;
 
 pub mod syscalls;
-
 
 /// Helper function to get the address of the Process Environment Block (PEB).
 ///
@@ -52,6 +50,3 @@ unsafe fn get_peb_address() -> Option<*const PEB> {
         Some(&*(peb_ptr))
     }
 }
-
-
-
