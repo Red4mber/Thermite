@@ -1,14 +1,7 @@
 #![feature(pointer_byte_offsets)]
-#![feature(iter_advance_by)] // I should find a way to do without
-///////////////////////////////////////////////////////////
-//
-//                   Main Library File
-//
-//          Made by RedAmber - 27 March 2024
-///////////////////////////////////////////////////////////
 
 use std::arch::asm;
-use crate::model::peb_teb::PEB;
+use crate::model::windows::peb_teb::PEB;
 
 pub mod model;
 pub mod error;
@@ -21,26 +14,23 @@ pub mod syscalls;
 ///
 /// # Safety
 ///
-/// This function performs unsafe operations and assumes the presence and validity of various
-/// Windows structures and memory layouts. It should only be called in a context where these
-/// assumptions are valid.
+/// This function is deemed unsafe by the rust gods because it uses inline assembly.
+/// However, it should be relatively safe to use, as this method is consistent.
 ///
 /// # Returns
 ///
 /// If the PEB address is successfully retrieved, returns `Some` with a pointer to the PEB.
-/// If the PEB address cannot be retrieved, returns `None`.
+/// If the PEB address somehow cannot be retrieved and returns a null pointer, it returns `None`.
 ///
 /// # Notes
 ///
-/// This function uses inline assembly to retrieve the PEB address from the appropriate Thread
-/// Environment Block (TEB) field based on the target architecture (x86 or x86_64).
+/// Only supports x86 or x86_64
 ///
-/// The Process Environment Block (PEB) is a user-mode data structure that contains essential
-/// information about the current process, including various data structures and lists that
-/// describe the modules loaded into the process's virtual address space.
+/// This function uses inline assembly to retrieve the PEB address from the appropriate
+/// Thread Environment Block (TEB) field based on the target architecture .
 unsafe fn get_peb_address() -> Option<*const PEB> {
     #[inline(always)]
-    fn peb_pointer() -> *const PEB {
+    fn read_peb_ptr() -> *const PEB {
         #[cfg(target_arch = "x86")]
         unsafe {
             let peb: *const PEB;
@@ -55,11 +45,11 @@ unsafe fn get_peb_address() -> Option<*const PEB> {
         }
     }
 
-    let peb_pointer = peb_pointer();
-    if peb_pointer.is_null() {
+    let peb_ptr = read_peb_ptr();
+    if peb_ptr.is_null() {
         None
     } else {
-        Some(&*(peb_pointer))
+        Some(&*(peb_ptr))
     }
 }
 

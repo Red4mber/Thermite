@@ -2,16 +2,16 @@ use std::fmt;
 use std::fmt::Formatter;
 use std::str::Utf8Error;
 
-
+/// Errors occurring during the parsing of DLLs
 pub enum DllParserError {
-    /// An error occurred while retrieving the Process Environment Block (PEB).
+    /// Failed to retrieve a pointer to the Process Environment Block (PEB).
     PebError,
     /// The requested function was not found.
     FunctionNotFound,
     /// An error occurred while parsing the name of the function.
     FunctionNameParsingError(Utf8Error),
     /// An error occurred while parsing the PE headers or export directory.
-    PEParsingError,
+    InvalidNtHeader,
     /// The requested module was not found.
     ModuleNotFound,
 }
@@ -21,7 +21,7 @@ impl fmt::Display for DllParserError {
             Self::PebError => write!(f, "Invalid PEB pointer"),
             Self::FunctionNotFound => write!(f, "The requested function was not found"),
             Self::FunctionNameParsingError(err) => write!(f, "Failed to parse function name : {err}"),
-            Self::PEParsingError => write!(f, "Failed to parse module: Invalid NT Signature"),
+            Self::InvalidNtHeader => write!(f, "Failed to parse module: Invalid NT Signature"),
             Self::ModuleNotFound => write!(f, "The requested module was not found"),
         }
     }

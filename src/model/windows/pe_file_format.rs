@@ -1,5 +1,5 @@
 #![allow(nonstandard_style)] 
-#![allow(unused)]
+// #![allow(unused)]
 
 ///////////////////////////////////////////////////////////
 //
@@ -11,6 +11,15 @@
 //
 //          Made by RedAmber - 26 March 2024
 ///////////////////////////////////////////////////////////
+
+
+/// All the structures are marked with `#[repr(C)]` to ensure that they are laid out in memory
+/// exactly the same way as the corresponding C structure.This is necessary for
+/// interoperability with other languages and systems that follow the C Application
+/// Binary Interface (ABI).
+
+
+
 
 //------------------------------------------------------------------ 
 //
@@ -507,6 +516,13 @@ pub struct IMAGE_DATA_DIRECTORY {
     pub Size: u32,
 }
 
+
+
+/// This structure describes the export information for a Dynamic Link Library (DLL).
+/// It is used to provide information about the exported functions and their addresses.
+///
+/// All "AddressOf" fields are RVA, Relative Virtual Addresses
+/// They are offsets, in bytes, from the base address of the DLL.
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct IMAGE_EXPORT_DIRECTORY {

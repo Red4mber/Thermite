@@ -1,11 +1,7 @@
-#![allow(unused)]
 use std::arch::global_asm;
 use std::ptr;
-use crate::dll_parser::{get_all_exported_functions, get_function_address, get_module_address};
-use crate::error::{DllParserError, ThermiteError};
-use crate::error::SyscallError::SSNNotFound;
-use crate::error::ThermiteError::SyscallError;
-
+use crate::dll_parser::{get_all_exported_functions, get_module_address};
+use crate::error::{DllParserError};
 
 #[derive(Debug, Clone)]
 pub struct Syscall {
@@ -76,7 +72,15 @@ execute:
     ret                         // Return
 "#);
 
+
+
 extern "C" {
+    /// Our wrapper around syscall, imported from the assembly code above
+    ///
+    /// Takes the following arguments :
+    ///  - `ssn` : An integer, the System Service Number of the syscall you want to call
+    ///  - `n_args`: An integer, refers to the count of arguments to pass to syscall (excluding these two, which are not passed to syscall)
+    ///  - ...  -> Then, every argument to pass to the syscall instruction.
     fn syscall_handler(
         ssn: u16,
         n_args: u32,
@@ -84,27 +88,29 @@ extern "C" {
     ) -> i32;
 }
 
+// TODO: Macro wrapper around the syscall handler
+
+
+
+
+
+
 /// TODO - Do another one, but better :D
+/// Search for the System Service Number (SSN) of a syscall in its code
+///
+/// # Arguments
+///
+/// - `syscall_addr` : The address of the function we are looking for, can be obtained with [`get_function_address`]
 ///
 /// Very simple way to find a ssn, but it works well if there's no hook
+/// Would shit the bed at the mere sight of an EDR, hence the name "simple"
 ///
-/// A normal syscall stub look like :
-/// 4C 8B D1           : MOV R10,RCX
-/// B8 ?? 00 00 00     : MOV EAX,SSN
-///
-/// We're looking for the SSN, so the 4th byte, just following 0xB8
-pub unsafe fn simple_get_ssn(syscall_name: &str) -> Result<u16, ThermiteError> {
-    let ntdll_handle= get_module_address("ntdll.dll")
-        .map_err(|e| { ThermiteError::DllParserError(e) })?;
-    let start_ptr = get_function_address(syscall_name, ntdll_handle)
-        .map_err(|e| { ThermiteError::DllParserError(e) })?;
-
-    if ptr::read(start_ptr.add(3)) == 0xB8 {    // Check if third byte is MOV EAX, so we don't read random values if it isn't
-        Ok((ptr::read(start_ptr.add(4)) as u16))//
-    } else {
-        Err(SyscallError(SSNNotFound))
-    }
+pub unsafe fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
+    if ptr::read(syscall_addr.add(3)) == 0xB8 {         // Check if third byte is MOV EAX,
+        Some(ptr::read(syscall_addr.add(4)) as u16)   // Then read the 4th byte as the expected SSN
+    } else { None }                                           // If not we simply return None
 }
+
 
 // TODO : Finish this - Do you really want a dyn ?
 pub fn get_all_ssn(_f: &dyn Fn(&str) -> u16) -> Result<Vec<Syscall>,DllParserError> {
@@ -115,7 +121,7 @@ pub fn get_all_ssn(_f: &dyn Fn(&str) -> u16) -> Result<Vec<Syscall>,DllParserErr
         .filter(|&x| {
             x.name.starts_with("Zw")
         })
-        .filter_map(|x| { unsafe { simple_get_ssn(x.name.as_str()) }.ok()
+        .filter_map(|x| { unsafe { simple_get_ssn(x.address) }
             .map(|ssn| {
                 Syscall {
                     name: x.name.clone(),
@@ -127,9 +133,6 @@ pub fn get_all_ssn(_f: &dyn Fn(&str) -> u16) -> Result<Vec<Syscall>,DllParserErr
         .collect();
     return Ok(ssns)
 }
-
-
-
 
 // TODO : Document this module properly
 // Not just with random-ass comments

@@ -2,12 +2,17 @@
 
 
 use thermite::dll_parser::{get_module_address, get_function_address, get_all_exported_functions, Export, get_all_loaded_modules};
+use thermite::error::DllParserError;
 
 
 fn main() {
+    // let module_addr = unsafe { get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
+    //     eprintln!("[TwT] {:#?}", err);
+    //     std::process::exit(1)
+    // });
     // example_get_function_address("ntdll.dll", "NtOpenProcess");
 
-    // example_all_exports();
+    example_all_exports();
 
     // let all_modules = unsafe { get_all_loaded_modules() }.unwrap();
     // println!("[^-^] Loaded Modules : {:#?}", all_modules);
@@ -15,15 +20,18 @@ fn main() {
     // let SSNs = unsafe{ thermite::syscalls::get_all_ssn() };
     // println!("[^-^] {:#x?}", SSNs);
 
-    let syscall_name = "NtOpenProcess";
-    match unsafe{ thermite::syscalls::simple_get_ssn(syscall_name) } {
-        Ok(ssn) => {
-            println!("[^-^] {syscall_name} SSN Found {:#x?}", ssn);
-        },
-        Err(err) => {
-            println!("[TwT] {syscall_name} : {err}");
-        }
-    };
+    // let syscall_name = "NtOpenProcess";
+    // let syscall_addr = unsafe { get_function_address(syscall_name, module_addr) }.unwrap();
+
+
+    // match unsafe{ thermite::syscalls::simple_get_ssn(syscall_addr) } {
+    //     Some(ssn) => {
+    //         println!("[^-^] {syscall_name} SSN: {:#x?}", ssn);
+    //     },
+    //     None => {
+    //         println!("[TwT] Failed to retrieve SSN for {syscall_name}");
+    //     }
+    // };
 }
 
 
@@ -31,17 +39,16 @@ fn main() {
 // I will move them eventually but i'm still working on it
 //
 fn example_all_exports() {
-    let mut exported_functions: Vec<Export>;
+
     let module_address = unsafe { get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
         eprintln!("[TwT] {:#?}", err);
         std::process::exit(1)
     });
-    unsafe {
-        exported_functions = get_all_exported_functions(module_address).unwrap_or_else(|err| {
-             eprintln!("[TwT] {:#?}", err);
-             std::process::exit(1)
-        });
-    }
+
+    let mut exported_functions: Vec<Export> = unsafe { get_all_exported_functions(module_address) }.unwrap_or_else(|err: DllParserError| {
+         eprintln!("[TwT] {:#?}", err);
+         std::process::exit(1)
+    });
 
     // Some usage examples :
     // Sort alphabetically by function name
