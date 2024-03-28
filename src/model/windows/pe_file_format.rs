@@ -1,18 +1,9 @@
 #![allow(nonstandard_style)] 
 // #![allow(unused)]
 
-///////////////////////////////////////////////////////////
-//
-//        == Windows Internals Rust Types ==
-//        -- Portable Executables and DLLs --
-//
-//           With some undocumented fields 
-//         because it's always nice to have :3
-//
-//          Made by RedAmber - 26 March 2024
-///////////////////////////////////////////////////////////
-
-
+/// All of these types are useful in some way for parsing PE Files, most specifically DLLs
+/// I could do without half of that, but i'm a completionist
+///
 /// All the structures are marked with `#[repr(C)]` to ensure that they are laid out in memory
 /// exactly the same way as the corresponding C structure.This is necessary for
 /// interoperability with other languages and systems that follow the C Application

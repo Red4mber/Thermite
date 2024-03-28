@@ -1,19 +1,14 @@
 #![allow(nonstandard_style)]
 // #![allow(unused)]
 
-///////////////////////////////////////////////////////////
-//
-//        == Windows Internals Rust Types ==
-//        -- Miscellaneous Windows Internals --
-//
-//              Like the PEB and stuff 
-//        Feel free to steal it, it works okay-ish 
-//
-//          Made by RedAmber - 26 March 2024
-///////////////////////////////////////////////////////////
-
 use std::ffi::c_void;
 use std::fmt;
+
+/// More than 500 lines of uselessness
+/// I literally could have replaced it with two or three structs at most and placeholders for the rest...
+/// Why do I do that to myself ?
+///
+
 
 
 //------------------------------------------------------------------
