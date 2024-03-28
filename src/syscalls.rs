@@ -1,6 +1,6 @@
 use std::arch::global_asm;
 use std::ptr;
-use crate::dll_parser::{get_all_exported_functions, get_module_address};
+use crate::dll_parser::{Export, get_all_exported_functions, get_module_address};
 use crate::error::{DllParserError};
 
 #[derive(Debug, Clone)]
@@ -73,7 +73,7 @@ execute:
 "#);
 
 
-
+#[allow(unused)]
 extern "C" {
     /// Our wrapper around syscall, imported from the assembly code above
     ///
@@ -95,33 +95,55 @@ extern "C" {
 
 
 
-/// TODO - Do another one, but better :D
-/// Search for the System Service Number (SSN) of a syscall in its code
+/// Simply retrieves the 4th byte of the function, if the 3rd is a MOV EAX, <???> instruction.
+/// If it's not, simply returns None
 ///
 /// # Arguments
 ///
 /// - `syscall_addr` : The address of the function we are looking for, can be obtained with [`get_function_address`]
 ///
 /// Very simple way to find a ssn, but it works well if there's no hook
-/// Would shit the bed at the mere sight of an EDR, hence the name "simple"
+/// but it would absolutely shit the bed at the mere sight of an EDR, hence the name "simple"
 ///
-pub unsafe fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
-    if ptr::read(syscall_addr.add(3)) == 0xB8 {         // Check if third byte is MOV EAX,
-        Some(ptr::read(syscall_addr.add(4)) as u16)   // Then read the 4th byte as the expected SSN
-    } else { None }                                           // If not we simply return None
+pub fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
+    unsafe {
+        if ptr::read(syscall_addr.add(3)) == 0xB8 {
+            Some(ptr::read(syscall_addr.add(4)) as u16)
+        } else { None }
+    }
 }
 
 
-// TODO : Finish this - Do you really want a dyn ?
-pub fn get_all_ssn(_f: &dyn Fn(&str) -> u16) -> Result<Vec<Syscall>,DllParserError> {
+
+/// Searches for every syscalls using the provided pattern
+/// It then executes the find_ssn function on every one of them to retrieve their syscall numbers
+///
+/// Returns a vector of [Syscall] containing the matches
+///
+/// # Examples:
+/// ```
+/// let ssn_array = unsafe{
+///      thermite::syscalls::search(|&x| {
+///         x.name.starts_with("Nt")
+///      }, thermite::syscalls::simple_get_ssn)
+///  }.unwrap();
+///
+///  println!("[^-^] Done! I found {:#?} matching syscalls !", ssn_array.len());
+///  if ssn_array.len() < 20 {
+///      println!("{ssn_array:#x?}");
+///  }
+/// ```
+pub fn search(
+    pattern: fn(&&Export) -> bool,
+    find_ssn: fn(*const u8) -> Option<u16>
+) -> Result<Vec<Syscall>,DllParserError> {
     let ntdll_handle = unsafe { get_module_address("ntdll.dll") }?;
 
     let ssns = unsafe { get_all_exported_functions(ntdll_handle) }?
         .iter()
-        .filter(|&x| {
-            x.name.starts_with("Zw")
-        })
-        .filter_map(|x| { unsafe { simple_get_ssn(x.address) }
+        .filter(pattern)
+        .filter_map(|x| {
+            find_ssn(x.address)
             .map(|ssn| {
                 Syscall {
                     name: x.name.clone(),
