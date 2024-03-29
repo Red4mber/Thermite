@@ -85,23 +85,35 @@ extern "C" {
     pub fn syscall_handler(ssn: u16, n_args: u32, ...) -> i32;
 }
 
-// TODO: Macro wrapper around the syscall handler
+// TODO: Implement variadic macro wrapper around syscall_handler() to compute n_args and fetch ssn
 
-/// Simply retrieves the 4th byte of the function, if the 3rd is a MOV EAX, <???> instruction.
-/// If it's not, simply returns None
-///
+
+
+/// Very simple function that reads a SSN from a clean syscall stubs
+/// 
+/// # How?
+/// Here's a "virgin" syscall stub, not hooked by an EDR:
+/// ```n
+/// Bytes : ________________  ;  Asm:_________
+/// 0x4c 0x8b 0xd1            ;	 mov r10, rcx
+/// 0xb8 0x?? 0x?? 0x00 0x00  ;	 mov eax, 0x?? 0x?? 0x00 0x00
+/// ; <etc...>                ;  <etc...>
+/// ```
+/// So we know we can find the SSN in after the MOV EAX, instruction
+/// So if the 4 first bytes are 0x4c, 0x8b, 0xd1 and 0xb8 we know the fifth byte will be the SSN and we can return it safely
+/// If we don't find these bytes, then the syscall stub has been tampered and we cannot recover the SSN, so we just return None
+/// 
 /// # Arguments
 ///
 /// - `syscall_addr` : The address of the function we are looking for, can be obtained with [`get_function_address`]
 ///
-/// Very simple way to find a ssn, but it works well if there's no hook
-/// but it would absolutely shit the bed at the mere sight of an EDR, hence the name "simple"
-///
 pub fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
     unsafe {
-        if ptr::read(syscall_addr.add(3)) == 0xB8 {
+        if ptr::read(syscall_addr as *const [u8;4]) == [0x4c, 0x8b, 0xd1, 0xb8] {
+            // The function is clean
             Some(ptr::read(syscall_addr.add(4)) as u16)
         } else {
+            // The function is hooked, or modified in some way
             None
         }
     }

