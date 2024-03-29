@@ -25,9 +25,9 @@ doc = false
 
 
 [dependencies]
-num = "0.4.1"
-num-derive = "0.4.2"
-num-traits = "0.2.18"
+#num = "0.4.1"
+#num-derive = "0.4.2"
+#num-traits = "0.2.18"
 # No dependency hell yeah
 
 

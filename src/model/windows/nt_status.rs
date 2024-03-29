@@ -1,9 +1,8 @@
 use std::fmt::{Display, Formatter};
-use num_derive::FromPrimitive;
 
 #[allow(overflowing_literals)]
 #[repr(i32)]
-#[derive(Debug, Clone, FromPrimitive)]
+#[derive(Debug, Clone)]
 pub enum NtStatus {
     ControlCExit = 0xC000013A,
     DbgAppNotIdle = 0xC0010002,
