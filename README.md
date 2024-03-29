@@ -1,4 +1,4 @@
-# Thermite: Offensive Rust
+# Thermite
 
 ## A Rust Malware development Learning Project
 
@@ -28,6 +28,12 @@ After all, knowledge is meant to be shared <3
 
 I admit that it doesn't make it easy, but that exactly what makes learning a new thing fun, so why not ?
 This project is driven entirely by curiosity, i did not choose this language because it's fast, secure or whatever, I just wanted to learn it, so here's me doing exactly that.
+
+### Why the name ? 
+
+What is thermite if not offensive rust ? 
+
+Also it's cool and all cool projects need a cool name. 
 
 ## License
 
