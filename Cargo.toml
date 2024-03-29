@@ -10,7 +10,7 @@ doc = true
 crate-type = ["lib"]
 
 [[bin]]
-name = "test-bin"
+name = "thermite-bin"
 test = false
 bench = false
 doc = false

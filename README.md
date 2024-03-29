@@ -11,7 +11,6 @@ pushing the limits of offensive security as we know it, I just do it for the joy
 It is written entirely in Rust and so far does not any dependencies at all.
 I tried as much as possible to make everything myself, mostly for learning,but also just for the sake of it.
 
-
 ## Features
 
 The library is already capable of performing direct syscalls, with dynamic system service number retrieval.
@@ -23,6 +22,10 @@ Feel free to browse the code, I took care to document absolutely everything and 
 
 I learned a lot while making this, maybe you too, who knows ?
 After all, knowledge is meant to be shared <3
+
+## Usage
+
+You can add the library
 
 ### Why rust ?
 

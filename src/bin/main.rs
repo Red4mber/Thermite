@@ -1,34 +1,23 @@
 #![allow(unused)]
 
-use thermite::dll_parser::{
-    get_all_exported_functions, get_all_loaded_modules, get_function_address, get_module_address,
+use thermite::peb_walk::{
+    get_all_exported_functions, list_modules, get_function_address, get_module_address,
     Export,
 };
 use thermite::error::DllParserError;
+use thermite::model::Export;
 use thermite::syscalls::simple_get_ssn;
 
 // This file is really only there for testing, hence why all the comments and the unused functions
 // It's just useful to have something to run
 
 fn main() {
-    // let module_addr = unsafe { get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
-    //     eprintln!("[TwT] {:#?}", err);
-    //     std::process::exit(1)
-    // });
-    // example_get_function_address("ntdll.dll", "NtOpenProcess");
-    // example_all_exports();
-    // test_syscall();
-    // let all_modules = unsafe { get_all_loaded_modules() }.unwrap();
-    // println!("[^-^] Loaded Modules : {:#?}", all_modules);
-
-    // let syscall_name = "NtOpenProcess";
-    // let syscall_addr = unsafe { get_function_address(syscall_name, module_addr) }.unwrap();
+    miscellanous_examples()
 }
 
 // Below are testing / example functions
-// I will move them eventually but i'm still working on it
-//
-fn example_all_exports() {
+// I will move them eventually but I'm still working on it
+ fn examples_all_exports() {
     let module_address = unsafe { get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
         eprintln!("[TwT] {:#?}", err);
         std::process::exit(1)
@@ -76,55 +65,21 @@ fn example_get_function_address(module_name: &str, function_name: &str) {
     }
 }
 
-fn get_syscalls() {
-    let syscalls_vec = unsafe {
-        thermite::syscalls::search(
-            |&x| {
-                x.name.eq_ignore_ascii_case("NtOpenProcess")
-                    || x.name.eq_ignore_ascii_case("NtAllocateVirtualMemory")
-                    || x.name.eq_ignore_ascii_case("NtWriteVirtualMemory")
-                    || x.name.eq_ignore_ascii_case("NtProtectVirtualMemory")
-                    || x.name.eq_ignore_ascii_case("NtWaitForSingleObject")
-                    || x.name.eq_ignore_ascii_case("NtClose")
-            },
-            simple_get_ssn,
-        )
-    }
-    .unwrap();
+fn no_filter(x: &&Export) -> bool {true}
 
+fn miscellanous_examples() {
+    // Get a list of all exports
+    let module_address = unsafe { get_module_address("ntdll.dll") }.unwrap();
+    let all_exports = unsafe { get_all_exported_functions(module_address) }.unwrap();
+
+    // Get a list of all syscalls
+    let all_syscalls = thermite::syscalls::search(
+        |x| true, // Do no filter exports
+        simple_get_ssn,           // Just search for SSNs to get all syscalls
+    ).unwrap();
     println!(
-        "[^-^] Done! I found {:#?} matching syscalls !",
-        syscalls_vec.len()
+        "[^-^] I found {:#?} syscalls in {:#?} exports",
+        all_syscalls.len(),
+        all_exports.len()
     );
-    if syscalls_vec.len() < 20 {
-        println!("{ssn_array:#x?}");
-    }
-
-    // let mut unique_addr: Vec<*const u8> = ssn_array.iter().map(|x| {
-    //     x.address
-    // }).collect();
-    // unique_addr.sort();
-    // unique_addr.dedup();
-    //
-    // println!("[^-^] {:#?} addresses are unique", unique_addr.len());
-}
-
-fn direct_syscalls_shellcode_injector(pid: u32, shellcode: &[u8]) {
-    println!("[?-?] Target process ID {pid}");
-
-    // Define the structures we need
-
-    // Get a handle to the target process
-
-    // Allocate some memory region in the target process for our shellcode
-
-    // Copy the shellcode to newly allocated memory
-
-    // Maybe ? Change protection status of allocated memory
-
-    // Create a remote thread in target process
-
-    // Wait for the thread to execute
-
-    // Close the handle
 }

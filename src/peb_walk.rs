@@ -1,34 +1,51 @@
-///////////////////////////////////////////////////////////
-//
-//        == DLL Export Table Parsing Module ==
-//
-///////////////////////////////////////////////////////////
-
+use std::arch::asm;
 use std::ffi::CStr;
 use std::slice;
 
 use crate::error::DllParserError;
-use crate::get_peb_address;
+use crate::model::Module;
 use crate::model::windows::pe_file_format::{
     IMAGE_EXPORT_DIRECTORY, IMAGE_NT_HEADERS, IMAGE_NT_SIGNATURE,
 };
-use crate::model::windows::peb_teb::LDR_DATA_TABLE_ENTRY;
+use crate::model::windows::peb_teb::{LDR_DATA_TABLE_ENTRY, PEB};
 
-/// Structure in which we will store a function found in the export table
-#[derive(Debug, Clone)]
-pub struct Export {
-    pub name: String,
-    pub address: *const u8,
-    pub ordinal: u16,
-}
-/// Structure in which we will store a module's information
-#[derive(Debug, Clone)]
-pub struct Module {
-    pub name: String,
-    pub address: *const u8,
+
+/// This function uses inline assembly to retrieve the PEB address from the appropriate
+/// Thread Environment Block (TEB) field based on the target architecture .
+///
+/// ## Returns
+///
+/// If the PEB address is successfully retrieved, returns `Some` with a pointer to the PEB.
+/// If the PEB address somehow cannot be retrieved and returns a null pointer, it returns `None`.
+///
+/// ## Notes
+///
+/// Only supports x86 or x86_64
+///
+unsafe fn get_peb_address() -> *const PEB {
+    #[inline(always)]
+    fn read_peb_ptr() -> *const PEB {
+        #[cfg(target_arch = "x86")]
+        unsafe {
+            let peb: *const PEB;
+            asm!("mov eax, fs:[0x30]", out("eax") peb, options(nomem, nostack, preserves_flags));
+            peb
+        }
+        #[cfg(target_arch = "x86_64")]
+        unsafe {
+            let peb: *const PEB;
+            asm!("mov rax, gs:[0x60]", out("rax") peb, options(nomem, nostack, preserves_flags));
+            peb
+        }
+    }
+    let peb_ptr = read_peb_ptr();
+    &*(peb_ptr)
 }
 
-/// Gets the base address of a loaded module by its name.
+
+
+
+/// Returns the address of a loaded DLL
 ///
 /// # Arguments
 ///
@@ -39,23 +56,17 @@ pub struct Module {
 /// If the module is found, returns `Ok` with the base address as a raw pointer.
 /// If the module is not found or an error occurs, returns `Err` with a [DllParserError].
 ///
-/// # Safety
-///
-/// This function performs unsafe operations and assumes the presence and validity of various
-/// Windows structures and memory layouts.
-/// It should only be called in a context where these assumptions are valid.
-///
 /// # Example
 /// ```
 /// let module_name = "kernel32.dll";
-/// match unsafe { thermite::dll_parser::get_module_address(module_name) } {
+/// match unsafe { thermite::peb_walk::get_module_address(module_name) } {
 ///     Ok(base_address) => println!("[^-^] Module base address: {:?}", base_address),
 ///     Err(error) => eprintln!("[TwT] Error: {:?}", error),
 /// };
 /// ```
 pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllParserError> {
     // Get the address of the Process Environment Block (PEB)
-    let peb = get_peb_address().ok_or(DllParserError::PebError)?;
+    let peb = get_peb_address();
 
     // Get a reference to the PEB 's Loader Data
     let ldr = (*peb).Ldr;
@@ -89,17 +100,11 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllPars
     }
 }
 
+
+
 /// Retrieves a list of all modules loaded in memory.
 ///
-/// This function takes a raw pointer to a loaded DLL and parses its export directory to
-/// retrieve information about all its exported functions.
-/// The resulting mapping associates each function's ordinal number with a `Module` struct containing
-/// the function's name, address, and ordinal number.
-///
-/// # Safety
-///
-/// This function is unsafe because it dereferences raw pointers to read the list of loaded modules
-/// directly from the Process Environment Block.
+/// This function will walk the PEB and other related memory structures 
 ///
 /// # Returns
 ///
@@ -116,10 +121,10 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllPars
 /// # Examples
 ///
 /// ```
-/// let all_modules = unsafe { thermite::dll_parser::get_all_loaded_modules() }.unwrap();
+/// let all_modules = unsafe { thermite::peb_walk::list_modules() }.unwrap();
 /// println!("[^-^] Loaded Modules : {:#?}", all_modules);
 /// ```
-pub unsafe fn get_all_loaded_modules() -> Result<Vec<Module>, DllParserError> {
+pub unsafe fn list_modules() -> Result<Vec<Module>, DllParserError> {
     let loader_info = (*get_peb_address().ok_or(DllParserError::PebError)?).Ldr;
     let mut list_entry = (*loader_info).InMemoryOrderModuleList.Flink;
     let last_module = (*loader_info).InMemoryOrderModuleList.Blink;
@@ -140,31 +145,11 @@ pub unsafe fn get_all_loaded_modules() -> Result<Vec<Module>, DllParserError> {
     }
 }
 
-/// #### Private Function
-/// # Safety
-///
-/// This function is unsafe because it dereferences raw pointers and relies on the correct structure of the DLL.
-/// This should be fine as long as you pass the correct address as argument.
-///
-/// # Arguments
-///
-/// * `base_address` - A raw pointer to the base address of the loaded DLL.
-///
-/// # Returns
-///
-/// A `Result` containing a tuple with the following elements:
-///
-/// * `&IMAGE_EXPORT_DIRECTORY` - A reference to the [IMAGE_EXPORT_DIRECTORY] structure.
-/// * `&[u32]` - A slice containing the RVA of the exported functions.
-/// * `&[u16]` - A slice containing the RVA of the exported functions with names.
-/// * `&[u32]` - A slice containing the RVA of the exported function names.
-///
-/// If the DLL is invalid the function returns the appropriate [`DllParserError`]
-///
-/// # Examples
-///
-/// Just go check-out [get_function_address] or [get_all_exported_functions] source code.
-///
+
+/// TODO 
+/// Make a proper rustdoc
+/// 
+/// 
 unsafe fn parse_export_directory<'a>(
     base_address: *const u8,
 ) -> Result<(IMAGE_EXPORT_DIRECTORY, &'a [u32], &'a [u16], &'a [u32]), DllParserError> {
@@ -213,6 +198,8 @@ unsafe fn parse_export_directory<'a>(
     ))
 }
 
+
+
 /// Finds the address of a function by its name in the export table of a loaded module.
 ///
 /// # Arguments
@@ -225,19 +212,13 @@ unsafe fn parse_export_directory<'a>(
 /// If the function is found, returns `Ok` with the function address as a raw pointer (`*const u8`).
 /// If the function is not found or an error occurs, returns `Err` with a custom error type.
 ///
-/// # Safety
-///
-/// This function performs unsafe operations and assumes the presence and validity of various
-/// Windows structures and memory layouts. It should only be called in a context where these
-/// assumptions are valid.
-///
 /// # Example
 ///
 /// ```
-/// let module_address = unsafe { thermite::dll_parser::get_module_address("ntdll.dll") }.unwrap();
+/// let module_address = unsafe { thermite::peb_walk::get_module_address("ntdll.dll") }.unwrap();
 ///
 /// let result = unsafe {
-///     thermite::dll_parser::get_function_address("NtOpenProcess", module_address)
+///     thermite::peb_walk::get_function_address("NtOpenProcess", module_address)
 /// };
 /// match result {
 ///     Ok(function_address) => println!("[^-^] Function address: {:?}", function_address),
@@ -278,12 +259,6 @@ pub unsafe fn get_function_address(
 /// This function takes a raw pointer to a loaded DLL and parses its export directory to retrieve all the exported functions.
 /// The resulting vector contains structures, each containing the function's name, address, and ordinal number.
 ///
-/// # Safety
-///
-/// This function is unsafe because it dereferences raw pointers and relies on the correct
-/// structure of the DLL. It is the caller's responsibility to ensure that the provided
-/// base address points to a valid, loaded DLL.
-///
 /// # Arguments
 ///
 /// * `base_address` - A raw pointer to the base address of the loaded DLL.
@@ -304,10 +279,10 @@ pub unsafe fn get_function_address(
 ///
 /// ```
 /// use thermite::error::DllParserError;
-/// use thermite::dll_parser::{Export, get_all_exported_functions};
+/// use thermite::peb_walk::{Export, get_all_exported_functions};
 ///
 /// // Get the address of a loaded DLL
-/// let module_address = unsafe { thermite::dll_parser::get_module_address("ntdll.dll") }.unwrap();
+/// let module_address = unsafe { thermite::peb_walk::get_module_address("ntdll.dll") }.unwrap();
 /// // Retrieve vec of exported functions
 /// let mut exported_functions: Vec<Export> = unsafe { get_all_exported_functions(module_address) }.unwrap();
 /// // You can now use the vec

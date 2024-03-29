@@ -1,4 +1,4 @@
-use thermite::dll_parser::Export;
+use thermite::peb_walk::Export;
 use std::{mem, process};
 use std::ffi::c_void;
 use std::ptr::null;
@@ -208,7 +208,7 @@ fn exec(pid: u32) {
             &mut base_addr,             // [in, out]         PVOID     *BaseAddress,
             &mut bytes_written,         // [in, out]         PULONG    NumberOfBytesToProtect,
             PAGE_EXECUTE_READ,          // [in]              ULONG     NewAccessProtection,
-            &mut old_protec             // [out]             PULONG    OldAccessProtection  ,
+            &mut old_protec             // [out]             PULONG    OldAccessProtection,
         );
         handle_status("NtProtectVirtualMemory", x);
     };

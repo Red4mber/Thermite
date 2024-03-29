@@ -1,46 +1,38 @@
-use crate::dll_parser::{get_all_exported_functions, get_module_address, Export};
+use crate::peb_walk::{get_all_exported_functions, get_module_address, Export};
 use crate::error::DllParserError;
 use std::arch::global_asm;
 use std::ptr;
 
-#[derive(Debug, Clone)]
-pub struct Syscall {
-    pub name: String,
-    pub address: *const u8,
-    pub ssn: u16,
-}
-/*
-We cannot use the usual syscall stub such as you would find in NTDLL.dll
-```asm
-mov r10,rcx
-mov eax,[ssn]
-syscall
-ret
-```
-Because we cannot dynamically generate the assembly code and execute it at runtime
-So we need to craft an assembly function that can take the SSN as parameters, which then
-causes all the arguments to end up in the next register.
 
-When calling a function on windows the arguments are passed like this : (except for floats, but that irrelevant for syscalls)
-In left-to-right order, in RCX, RDX, R8, and R9,
+/*
+Explanations of the following assembly code
+
+When calling a function on Windows the parameters (except floats) are passed like this :
+
+Parameter 1, 2, 3, 4 in RCX, RDX, R8, and R9,
 The fifth and higher arguments are called stack parameters, they will be pushed on the stack
 RSP+28, +30, +32 etc...
 
-We need them in this order before executing the syscall instruction, so we need to move them back
-The only exception being the first parameter, which goes in r10 for all syscalls (even in the NTDLL code)
-the first four are easy to deal with, but the stack parameters demand more work
+Because we cannot dynamically generate the assembly code and execute it at runtime, we need to craft 
+a syscall stub that can take the SSN as argument which then causes all the other arguments to end up in the next register.
+(with the SSN now being Arg1, Arg1 becomes Arg2, which in turn ends up as Arg3 etc...)  
+So we need to put them back in order before executing the syscall instruction.
 
-But by decrementing the number of arguments by 4, we have the number of stack parameters
-We store it the RCX register because it is the counter for the REP instruction, that will repeat the MOVSQ instruction
-MOVSQ will then repeat until RCX reaches zero
+However, there is a single exception to this calling convention, only for syscalls, the first parameter goes in the r10 register
+this is because the syscall instruction will overwrite RCX eventually, so we move rcx to r10 to preserve it  
 
-It's quite a brilliant solution and I take absolutely zero credit for it, go check janoglezcampos on GitHub, that's where I found this
+The stack parameters are also a little bit more complicated than the first four parameters : 
+When we check if we have more than 4 parameters, we decrement RCX (which is arg. count) by 4, then jump if RCX < 0,
+This has the added benefit of storing the number of stack parameters in RCX, because we now don't count the first four stored in registers 
+This has even a third benefit, when looping using the REP instruction, RCX gets decremented, 
+giving us a 3-for-1 combo = Comparison + Counter + Loop in a single register o// 
 
-because the code had no comments and I suck hard at assembly,
-It took me a whole day just to figure out how it worked, so now I'm leaving comments everywhere
-
-Block comments can be folded on most editors, so there's nothing to lose
+It's quite a smart solution and I take absolutely zero credit for it, i found this on github
+I tried rewriting it myself but end up rewriting exactly the same stub each time :|
+        
+                ___go check janoglezcampos/syscall-rs on GitHub___ 
 */
+
 global_asm!(
     r#"
 .global syscall_handler
@@ -99,9 +91,12 @@ extern "C" {
 /// 0xb8 0x?? 0x?? 0x00 0x00  ;	 mov eax, 0x?? 0x?? 0x00 0x00
 /// ; <etc...>                ;  <etc...>
 /// ```
-/// So we know we can find the SSN in after the MOV EAX, instruction
-/// So if the 4 first bytes are 0x4c, 0x8b, 0xd1 and 0xb8 we know the fifth byte will be the SSN and we can return it safely
-/// If we don't find these bytes, then the syscall stub has been tampered and we cannot recover the SSN, so we just return None
+/// So we know we can find the SSN in after the MOV EAX instruction, in the 5 and 6th bytes of the function
+/// So if the 4 first bytes are `0x4c`, `0x8b`, `0xd1` and `0xb8`,  
+/// We know the fifth byte will be the SSN and we can return it safely
+/// 
+/// If we don't find these bytes, it's either not a valid syscall address, either a valid syscall which has been modified, by 
+/// We cannot recover the SSN so we just return None
 /// 
 /// # Arguments
 ///
