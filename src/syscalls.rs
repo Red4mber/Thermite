@@ -1,9 +1,8 @@
-use crate::peb_walk::{get_all_exported_functions, get_module_address};
-use crate::models::{Export, Syscall};
 use crate::error::DllParserError;
+use crate::models::{Export, Syscall};
+use crate::peb_walk::{get_all_exported_functions, get_module_address};
 use std::arch::global_asm;
 use std::ptr;
-
 
 /*
 Explanations of the following assembly code
@@ -80,8 +79,6 @@ extern "C" {
 
 // TODO: Implement variadic macro wrapper around syscall_handler() to compute n_args and fetch ssn
 
-
-
 /// Very simple function that reads a SSN from a clean syscall stubs
 ///
 /// # How?
@@ -105,7 +102,7 @@ extern "C" {
 ///
 pub fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
     unsafe {
-        if ptr::read(syscall_addr as *const [u8;4]) == [0x4c, 0x8b, 0xd1, 0xb8] {
+        if ptr::read(syscall_addr as *const [u8; 4]) == [0x4c, 0x8b, 0xd1, 0xb8] {
             // The function is clean
             Some(ptr::read(syscall_addr.add(4)) as u16)
         } else {

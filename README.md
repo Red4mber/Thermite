@@ -11,9 +11,15 @@ pushing the limits of offensive security as we know it, I just do it for the joy
 It is written entirely in Rust and so far does not any dependencies at all.
 I tried as much as possible to make everything myself, mostly for learning,but also just for the sake of it.
 
-## Features
+## What it does
 
-The library is already capable of performing direct syscalls, with dynamic system service number retrieval.
+The library is already capable of:
+
+- Walking the PEB structures to enumerate all loaded modules - GetModuleHandle() alike
+- Walking a module's internal structures to enumerate all its exports - GetProcAddress() alike
+- Dynamically extract syscalls numbers from NTDLL.dll `(if not hooked)`    - Hells Gate
+- Performing direct syscalls -
+
 In the src/examples folder, there is a file showcasing it's capabilities with a shellcode injector using syscalls.
 
 so far it does not support 32bit architecture and there's still a lot of stuff that have yet to be implemented, the road is long had of me.
@@ -25,7 +31,13 @@ After all, knowledge is meant to be shared <3
 
 ## Usage
 
-You can add the library
+You can add the library by adding the lines in your `cargo.toml` :
+
+```toml
+regex = { git = "https://github.com/Red4mber/Thermite.git" }
+```
+
+Then go check out [the code on github](src/examples/direct_syscalls_shellcode_injector.rs)
 
 ### Why rust ?
 

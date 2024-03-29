@@ -1,10 +1,10 @@
 #![allow(unused)]
 
-use thermite::peb_walk::{
-    get_all_exported_functions, list_modules, get_function_address, get_module_address,
-};
 use thermite::error::DllParserError;
 use thermite::models::Export;
+use thermite::peb_walk::{
+    get_all_exported_functions, get_function_address, get_module_address, list_modules,
+};
 use thermite::syscalls::simple_get_ssn;
 
 // This file is really only there for testing, hence why all the comments and the unused functions
@@ -16,7 +16,7 @@ fn main() {
 
 // Below are testing / example functions
 // I will move them eventually but I'm still working on it
- fn examples_all_exports() {
+fn examples_all_exports() {
     let module_address = unsafe { get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
         eprintln!("[TwT] {:#?}", err);
         std::process::exit(1)
@@ -64,7 +64,9 @@ fn example_get_function_address(module_name: &str, function_name: &str) {
     }
 }
 
-fn no_filter(x: &&Export) -> bool {true}
+fn no_filter(x: &&Export) -> bool {
+    true
+}
 
 fn miscellanous_examples() {
     // Get a list of all exports
@@ -73,9 +75,10 @@ fn miscellanous_examples() {
 
     // Get a list of all syscalls
     let all_syscalls = thermite::syscalls::search(
-        |x| true, // Do no filter exports
-        simple_get_ssn,           // Just search for SSNs to get all syscalls
-    ).unwrap();
+        |x| true,       // Do no filter exports
+        simple_get_ssn, // Just search for SSNs to get all syscalls
+    )
+    .unwrap();
     println!(
         "[^-^] I found {:#?} syscalls in {:#?} exports",
         all_syscalls.len(),

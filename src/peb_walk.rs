@@ -4,12 +4,11 @@ use std::ffi::CStr;
 use std::slice;
 
 use crate::error::DllParserError;
-use crate::models::Module;
 use crate::models::windows::pe_file_format::{
     IMAGE_EXPORT_DIRECTORY, IMAGE_NT_HEADERS, IMAGE_NT_SIGNATURE,
 };
 use crate::models::windows::peb_teb::{LDR_DATA_TABLE_ENTRY, PEB};
-
+use crate::models::Module;
 
 /// This function uses inline assembly to retrieve the PEB address from the appropriate
 /// Thread Environment Block (TEB) field based on the target architecture .
@@ -42,9 +41,6 @@ unsafe fn get_peb_address() -> *const PEB {
     let peb_ptr = read_peb_ptr();
     &*(peb_ptr)
 }
-
-
-
 
 /// Returns the address of a loaded DLL
 ///
@@ -101,11 +97,9 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllPars
     }
 }
 
-
-
 /// Retrieves a list of all modules loaded in memory.
 ///
-/// This function will walk the PEB and other related memory structures 
+/// This function will walk the PEB and other related memory structures
 ///
 /// # Returns
 ///
@@ -146,11 +140,10 @@ pub unsafe fn list_modules() -> Result<Vec<Module>, DllParserError> {
     }
 }
 
-
-/// TODO 
+/// TODO
 /// Make a proper rustdoc
-/// 
-/// 
+///
+///
 unsafe fn parse_export_directory<'a>(
     base_address: *const u8,
 ) -> Result<(IMAGE_EXPORT_DIRECTORY, &'a [u32], &'a [u16], &'a [u32]), DllParserError> {
@@ -198,8 +191,6 @@ unsafe fn parse_export_directory<'a>(
         address_of_names,
     ))
 }
-
-
 
 /// Finds the address of a function by its name in the export table of a loaded module.
 ///
