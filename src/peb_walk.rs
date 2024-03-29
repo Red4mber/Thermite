@@ -1,13 +1,14 @@
+use crate::models::Export;
 use std::arch::asm;
 use std::ffi::CStr;
 use std::slice;
 
 use crate::error::DllParserError;
-use crate::model::Module;
-use crate::model::windows::pe_file_format::{
+use crate::models::Module;
+use crate::models::windows::pe_file_format::{
     IMAGE_EXPORT_DIRECTORY, IMAGE_NT_HEADERS, IMAGE_NT_SIGNATURE,
 };
-use crate::model::windows::peb_teb::{LDR_DATA_TABLE_ENTRY, PEB};
+use crate::models::windows::peb_teb::{LDR_DATA_TABLE_ENTRY, PEB};
 
 
 /// This function uses inline assembly to retrieve the PEB address from the appropriate
@@ -125,7 +126,7 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllPars
 /// println!("[^-^] Loaded Modules : {:#?}", all_modules);
 /// ```
 pub unsafe fn list_modules() -> Result<Vec<Module>, DllParserError> {
-    let loader_info = (*get_peb_address().ok_or(DllParserError::PebError)?).Ldr;
+    let loader_info = (*get_peb_address()).Ldr;
     let mut list_entry = (*loader_info).InMemoryOrderModuleList.Flink;
     let last_module = (*loader_info).InMemoryOrderModuleList.Blink;
     let mut loaded_modules: Vec<Module> = vec![];

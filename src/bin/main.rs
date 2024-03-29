@@ -2,10 +2,9 @@
 
 use thermite::peb_walk::{
     get_all_exported_functions, list_modules, get_function_address, get_module_address,
-    Export,
 };
 use thermite::error::DllParserError;
-use thermite::model::Export;
+use thermite::models::Export;
 use thermite::syscalls::simple_get_ssn;
 
 // This file is really only there for testing, hence why all the comments and the unused functions

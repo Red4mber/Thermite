@@ -1,4 +1,5 @@
-use crate::peb_walk::{get_all_exported_functions, get_module_address, Export};
+use crate::peb_walk::{get_all_exported_functions, get_module_address};
+use crate::models::{Export, Syscall};
 use crate::error::DllParserError;
 use std::arch::global_asm;
 use std::ptr;
@@ -13,24 +14,24 @@ Parameter 1, 2, 3, 4 in RCX, RDX, R8, and R9,
 The fifth and higher arguments are called stack parameters, they will be pushed on the stack
 RSP+28, +30, +32 etc...
 
-Because we cannot dynamically generate the assembly code and execute it at runtime, we need to craft 
+Because we cannot dynamically generate the assembly code and execute it at runtime, we need to craft
 a syscall stub that can take the SSN as argument which then causes all the other arguments to end up in the next register.
-(with the SSN now being Arg1, Arg1 becomes Arg2, which in turn ends up as Arg3 etc...)  
+(with the SSN now being Arg1, Arg1 becomes Arg2, which in turn ends up as Arg3 etc...)
 So we need to put them back in order before executing the syscall instruction.
 
 However, there is a single exception to this calling convention, only for syscalls, the first parameter goes in the r10 register
-this is because the syscall instruction will overwrite RCX eventually, so we move rcx to r10 to preserve it  
+this is because the syscall instruction will overwrite RCX eventually, so we move rcx to r10 to preserve it
 
-The stack parameters are also a little bit more complicated than the first four parameters : 
+The stack parameters are also a little bit more complicated than the first four parameters :
 When we check if we have more than 4 parameters, we decrement RCX (which is arg. count) by 4, then jump if RCX < 0,
-This has the added benefit of storing the number of stack parameters in RCX, because we now don't count the first four stored in registers 
-This has even a third benefit, when looping using the REP instruction, RCX gets decremented, 
-giving us a 3-for-1 combo = Comparison + Counter + Loop in a single register o// 
+This has the added benefit of storing the number of stack parameters in RCX, because we now don't count the first four stored in registers
+This has even a third benefit, when looping using the REP instruction, RCX gets decremented,
+giving us a 3-for-1 combo = Comparison + Counter + Loop in a single register o//
 
 It's quite a smart solution and I take absolutely zero credit for it, i found this on github
 I tried rewriting it myself but end up rewriting exactly the same stub each time :|
-        
-                ___go check janoglezcampos/syscall-rs on GitHub___ 
+
+                ___go check janoglezcampos/syscall-rs on GitHub___
 */
 
 global_asm!(
@@ -82,7 +83,7 @@ extern "C" {
 
 
 /// Very simple function that reads a SSN from a clean syscall stubs
-/// 
+///
 /// # How?
 /// Here's a "virgin" syscall stub, not hooked by an EDR:
 /// ```n
@@ -92,12 +93,12 @@ extern "C" {
 /// ; <etc...>                ;  <etc...>
 /// ```
 /// So we know we can find the SSN in after the MOV EAX instruction, in the 5 and 6th bytes of the function
-/// So if the 4 first bytes are `0x4c`, `0x8b`, `0xd1` and `0xb8`,  
+/// So if the 4 first bytes are `0x4c`, `0x8b`, `0xd1` and `0xb8`,
 /// We know the fifth byte will be the SSN and we can return it safely
-/// 
-/// If we don't find these bytes, it's either not a valid syscall address, either a valid syscall which has been modified, by 
+///
+/// If we don't find these bytes, it's either not a valid syscall address, either a valid syscall which has been modified, by
 /// We cannot recover the SSN so we just return None
-/// 
+///
 /// # Arguments
 ///
 /// - `syscall_addr` : The address of the function we are looking for, can be obtained with [`get_function_address`]

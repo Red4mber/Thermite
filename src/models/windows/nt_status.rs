@@ -2998,7 +2998,6 @@ impl Display for NtStatus {
     }
 }
 
-
 // All deleted variants below :
 /*
 StatusWait0 = 0x0,

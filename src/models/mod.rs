@@ -1,5 +1,9 @@
 pub mod windows;
 
+
+
+
+
 // SYSCALL MODELS
 // ---
 
@@ -10,7 +14,6 @@ pub struct Syscall {
     pub address: *const u8,
     pub ssn: u16,
 }
-
 
 // PEB WALK MODELS
 // ---
@@ -29,5 +32,3 @@ pub struct Module {
     pub name: String,
     pub address: *const u8,
 }
-
-

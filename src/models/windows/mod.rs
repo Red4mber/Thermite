@@ -13,6 +13,5 @@ pub mod pe_file_format;
 // A single enum with 3000 variants to match NT_STATUS to actual legible errors
 pub mod nt_status;
 
-
 // MASSIVE TODO: Clean up all these modules and remove everything unused
 // Todo two : Reformat / Refactor both modules to respect rusts naming convention and make it easier to read
