@@ -1,9 +1,3 @@
-///
-/// This example showcase the use of the thermite crate with a relatively simple shellcode injector
-///
-/// It is still very crude as most of the crate's functionalities are not yet implemented. 
-/// But i'll keep updating it from time to time.
-
 use thermite::dll_parser::Export;
 use std::{mem, process};
 use std::ffi::c_void;
@@ -106,11 +100,6 @@ fn read_pid() -> Option<u32> {
         Some(pid)
     } else { None }
 }
-
-
-////
-///        MAIN FUNCTIONALITIES 
-////
 
 
 ///
