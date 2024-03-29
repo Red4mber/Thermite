@@ -6,23 +6,16 @@ This is a **learning project** aimed at exploring advanced topics in Windows int
 evasion techniques. It is written entirely in Rust and so far does not any dependencies at all.
 
 I do not have any ambition for this project to become a game-breaking tool for red-teams or a high take research project
-pushing the limits of EDRs, I just do it for the joy of it and to learn cool tricks, I don't even know why you're
-reading this to be honest
+pushing the limits of offensive security as we know it, I just do it for the joy of it and to learn rust programming and some cool hacking tricks 
 
 ## Features
 
-Well, so far not much ^-^"
-But it's been a week since I started coding, so chill out, it won't be ready soon.
+The library is already capable of performing direct syscalls, with dynamic system service number retrieval.
+In the examples folder, there is a file showcasing it's capabilities with a shellcode injector using syscalls.
 
-I finished working on parsing loaded DLLs in memory to extract export function, then wrote a (very)basic function to
-dynamically retrieve Syscall numbers.
-The assembly part is done, so you should be able to use it to make direct syscalls, but I still need to work on it a
-little, mostly to clean it up.
+so far it does not support 32bit architecture and there's still a lot of stuff that have yet to be implemented, the road is long had of me.
 
-I'll probably work on indirect syscalls next, as it seems like the logical thing to do, but I don't plan much, so far I've been completely winging it, and the result is pretty fine.
-
-Feel free to browse the code, I took care to document absolutely everything and wrote detailed documentation for every
-function so far.
+Feel free to browse the code, I took care to document absolutely everything and wrote detailed comments and documentation for almost everything in the crate.
 
 I learned a lot while making this, maybe you too, who knows ?
 Knowledge is meant to be shared <3
@@ -39,4 +32,4 @@ Nah, just take it
 
 ## Disclaimer
 
-Just don't be evil.
+Just don't be evil :)
