@@ -16,7 +16,7 @@ pub enum DllParserError {
     ModuleNotFound,
 }
 impl fmt::Display for DllParserError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::PebError => write!(f, "Invalid PEB pointer"),
             Self::FunctionNotFound => write!(f, "The requested function was not found"),
@@ -29,7 +29,7 @@ impl fmt::Display for DllParserError {
     }
 }
 impl fmt::Debug for DllParserError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         fmt::Display::fmt(self, f)
     }
 }
@@ -38,14 +38,14 @@ pub enum SyscallError {
     SSNNotFound,
 }
 impl fmt::Display for SyscallError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::SSNNotFound => write!(f, "The requested System Service Number was not found"),
         }
     }
 }
 impl fmt::Debug for SyscallError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         fmt::Display::fmt(self, f)
     }
 }
@@ -54,7 +54,7 @@ pub enum ThermiteError {
     SyscallError(SyscallError),
 }
 impl fmt::Display for ThermiteError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Self::DllParserError(err) => write!(f, "{}", err.to_string()),
             Self::SyscallError(err) => write!(f, "{}", err.to_string()),
@@ -62,7 +62,7 @@ impl fmt::Display for ThermiteError {
     }
 }
 impl fmt::Debug for ThermiteError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         fmt::Display::fmt(self, f)
     }
 }

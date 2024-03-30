@@ -26,7 +26,7 @@ doc = false
 
 [dependencies]
 
-# Not needed i just wanted to learn about cargo profiles
+# Not needed I just wanted to learn about cargo profiles
 [profile.release]
 debug = false           # Well of course
 lto = true              # Link Time Optimization. Produces better optimized code at the cost of longer linking time.

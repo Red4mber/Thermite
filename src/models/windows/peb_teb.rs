@@ -248,7 +248,7 @@ pub enum LDR_DDAG_STATE {
     LdrModulesReadyToRun = 9,
 }
 
-/// Self explanatory
+/// Self-Explanatory
 /// Reason why the DLL is loaded
 /// Only found in LDR_DATA_TABLE_ENTRY.
 #[repr(i32)]
@@ -452,8 +452,8 @@ pub struct UNICODE_STRING {
     pub Buffer: *const u16,
 }
 //
-// I swear i'm gonna put a head sized hole in my desk after
-// having to manually implement fmt::Display and Debug for a ********* string
+// I swear, I'm going to put a head sized hole in my desk if I ever have
+// to implement fmt::Display and Debug for a string
 impl fmt::Display for UNICODE_STRING {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let buffer = unsafe {

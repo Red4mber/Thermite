@@ -15,7 +15,7 @@ use thermite::{count_args, syscall, syscalls};
 fn main() {}
 
 // Below are testing / example functions
-// I will move them eventually but I'm still working on it
+// I will move them eventually, but I'm still working on it
 fn examples_all_exports() {
     // Get the address of a DLL
     let module_address = unsafe { get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
@@ -75,7 +75,7 @@ fn miscellanous_examples() {
     let all_exports = unsafe { get_all_exported_functions(module_address) }.unwrap();
 
     // Get a list of all syscalls
-    let all_syscalls = thermite::syscalls::search(
+    let all_syscalls = syscalls::search(
         |x| true,       // Do no filter exports
         simple_get_ssn, // Just search for SSNs to get all syscalls
     )

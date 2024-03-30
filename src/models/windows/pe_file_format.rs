@@ -2,7 +2,7 @@
 // #![allow(unused)]
 
 /// All of these types are useful in some way for parsing PE Files, most specifically DLLs
-/// I could do without half of that, but i'm a completionist
+/// I could do without half of that, but I'm a completionist
 ///
 /// All the structures are marked with `#[repr(C)]` to ensure that they are laid out in memory
 /// exactly the same way as the corresponding C structure.This is necessary for

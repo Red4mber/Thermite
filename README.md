@@ -20,7 +20,7 @@ The library is already capable of:
 - Dynamically extract syscalls numbers from NTDLL.dll `(if not hooked)`    - Hells Gate
 - Performing direct syscalls
 
-In the src/examples folder, there is a short example showcasing it's capabilities with a shellcode injector using
+In the src/examples folder, there is a short example showcasing its capabilities with a shellcode injector using
 syscalls.
 
 so far it does not support 32bit architecture and there's still a lot of stuff that have yet to be implemented, the road is long had of me.
@@ -39,18 +39,19 @@ You can add the library by adding the lines in your `cargo.toml` :
 regex = { git = "https://github.com/Red4mber/Thermite.git" }
 ```
 
-Then go check out [the code on github](src/examples/shellcode_injector)
+Then go check out [the code on GitHub](src/examples/shellcode_injector.rs)
 
 ### Why rust ?
 
 I admit that it doesn't make it easy, but that exactly what makes learning a new thing fun, so why not ?
-This project is driven entirely by curiosity, i did not choose this language because it's fast, secure or whatever, I just wanted to learn it, so here's me doing exactly that.
+This project is driven entirely by curiosity, I did not choose this language because it's fast, secure or whatever, I
+just wanted to learn it, so here's me doing exactly that.
 
 ### Why the name ? 
 
 What is thermite if not offensive rust ? 
 
-Also it's cool and all cool projects need a cool name. 
+Also, it's cool and all cool projects need a cool name.
 
 ## License
 
