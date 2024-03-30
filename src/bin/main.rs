@@ -6,29 +6,30 @@ use thermite::peb_walk::{
     get_all_exported_functions, get_function_address, get_module_address, list_modules,
 };
 use thermite::syscalls::simple_get_ssn;
+use thermite::{count_args, syscall, syscalls};
 
-// This file is really only there for testing, hence why all the comments and the unused functions
-// It's just useful to have something to run
+// This file mostly serve as a scratchpad to test stuff
+// none of what's here is really made to be definitive or representative of anything
+// Go check out the [examples/] folder for real examples
 
-fn main() {
-    miscellanous_examples()
-}
+fn main() {}
 
 // Below are testing / example functions
 // I will move them eventually but I'm still working on it
 fn examples_all_exports() {
+    // Get the address of a DLL
     let module_address = unsafe { get_module_address("ntdll.dll") }.unwrap_or_else(|err| {
         eprintln!("[TwT] {:#?}", err);
         std::process::exit(1)
     });
 
+    // Parse the export table
     let mut exported_functions: Vec<Export> = unsafe { get_all_exported_functions(module_address) }
         .unwrap_or_else(|err: DllParserError| {
             eprintln!("[TwT] {:#?}", err);
             std::process::exit(1)
         });
 
-    // Some usage examples :
     // Sort alphabetically by function name
     exported_functions.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
 

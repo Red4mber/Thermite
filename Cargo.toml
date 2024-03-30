@@ -17,19 +17,14 @@ doc = false
 path = "src/bin/main.rs"
 
 [[example]]
-name = "direct-syscall-shellcode-inject"
-path = "src/examples/direct_syscalls_shellcode_injector.rs"
+name = "shellcode-injector"
+path = "src/examples/shellcode_injector.rs"
 test = false
 bench = false
 doc = false
 
 
 [dependencies]
-#num = "0.4.1"
-#num-derive = "0.4.2"
-#num-traits = "0.2.18"
-# No dependency hell yeah
-
 
 # Not needed i just wanted to learn about cargo profiles
 [profile.release]

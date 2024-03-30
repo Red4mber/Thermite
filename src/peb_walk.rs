@@ -22,7 +22,7 @@ use crate::models::Module;
 ///
 /// Only supports x86 or x86_64
 ///
-unsafe fn get_peb_address() -> *const PEB {
+pub unsafe fn get_peb_address() -> *const PEB {
     #[inline(always)]
     fn read_peb_ptr() -> *const PEB {
         #[cfg(target_arch = "x86")]
@@ -97,6 +97,7 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllPars
     }
 }
 
+///
 /// Retrieves a list of all modules loaded in memory.
 ///
 /// This function will walk the PEB and other related memory structures
@@ -140,10 +141,9 @@ pub unsafe fn list_modules() -> Result<Vec<Module>, DllParserError> {
     }
 }
 
-/// TODO
-/// Make a proper rustdoc
+/// Returns the [IMAGE_EXPORT_DIRECTORY] of loaded DLL and the `AddressOfFunctions`, `AddressOfNameOrdinals` and `AddressOfNames` arrays referenced inside
 ///
-///
+/// Mostly just made to avoid having to reapeat this code in every function that need them
 unsafe fn parse_export_directory<'a>(
     base_address: *const u8,
 ) -> Result<(IMAGE_EXPORT_DIRECTORY, &'a [u32], &'a [u16], &'a [u32]), DllParserError> {
@@ -201,7 +201,7 @@ unsafe fn parse_export_directory<'a>(
 ///
 /// # Returns
 ///
-/// If the function is found, returns `Ok` with the function address as a raw pointer (`*const u8`).
+/// If the function is found, returns `Ok` with a raw pointer (`*const u8`) to the function.
 /// If the function is not found or an error occurs, returns `Err` with a custom error type.
 ///
 /// # Example
@@ -277,7 +277,6 @@ pub unsafe fn get_function_address(
 /// let module_address = unsafe { thermite::peb_walk::get_module_address("ntdll.dll") }.unwrap();
 /// // Retrieve vec of exported functions
 /// let mut exported_functions: Vec<Export> = unsafe { get_all_exported_functions(module_address) }.unwrap();
-/// // You can now use the vec
 /// ```
 pub unsafe fn get_all_exported_functions(
     base_address: *const u8,

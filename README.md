@@ -18,13 +18,15 @@ The library is already capable of:
 - Walking the PEB structures to enumerate all loaded modules - GetModuleHandle() alike
 - Walking a module's internal structures to enumerate all its exports - GetProcAddress() alike
 - Dynamically extract syscalls numbers from NTDLL.dll `(if not hooked)`    - Hells Gate
-- Performing direct syscalls -
+- Performing direct syscalls
 
-In the src/examples folder, there is a file showcasing it's capabilities with a shellcode injector using syscalls.
+In the src/examples folder, there is a short example showcasing it's capabilities with a shellcode injector using
+syscalls.
 
 so far it does not support 32bit architecture and there's still a lot of stuff that have yet to be implemented, the road is long had of me.
 
-Feel free to browse the code, I took care to document absolutely everything and wrote detailed comments and documentation for almost everything in the crate.
+Feel free to browse the code, this project is kinda like my notebook, I took care to document absolutely everything and
+wrote detailed comments and documentation for almost everything in the crate.
 
 I learned a lot while making this, maybe you too, who knows ?
 After all, knowledge is meant to be shared <3
@@ -37,7 +39,7 @@ You can add the library by adding the lines in your `cargo.toml` :
 regex = { git = "https://github.com/Red4mber/Thermite.git" }
 ```
 
-Then go check out [the code on github](src/examples/direct_syscalls_shellcode_injector.rs)
+Then go check out [the code on github](src/examples/shellcode_injector)
 
 ### Why rust ?
 

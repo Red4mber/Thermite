@@ -1,9 +1,7 @@
 pub mod windows;
 
-// SYSCALL MODELS
-// ---
-
-/// Structure in which we will store a syscall with only the data we really need
+/// Represents a syscall, we mostly only need the name and System Service Number
+/// But keeping the address of syscalls allows us to sort them, to take a guess at SSNs we couldn't find
 #[derive(Debug, Clone)]
 pub struct Syscall {
     pub name: String,
@@ -11,10 +9,7 @@ pub struct Syscall {
     pub ssn: u16,
 }
 
-// PEB WALK MODELS
-// ---
-
-/// Structure in which we will store a function found in the export table
+/// Represents a function in the export table of a DLL
 #[derive(Debug, Clone)]
 pub struct Export {
     pub name: String,
@@ -22,7 +17,8 @@ pub struct Export {
     pub ordinal: u16,
 }
 
-/// Structure in which we will store a module's information
+/// Structure to represent a loaded DLL
+/// We only really need the name and address
 #[derive(Debug, Clone)]
 pub struct Module {
     pub name: String,
