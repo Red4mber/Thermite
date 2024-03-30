@@ -1,14 +1,11 @@
-use crate::error::DllParserError;
-use crate::models::{Export, Syscall};
-use crate::peb_walk::{get_all_exported_functions, get_module_address};
 use std::arch::global_asm;
 use std::ptr;
 
+use crate::error::DllParserError;
+use crate::models::{Export, Syscall};
+use crate::peb_walk::{get_all_exported_functions, get_module_address};
+
 /*
-Explanations of the following assembly code
-
-When calling a function on Windows the parameters (except floats) are passed like this :
-
 Parameter 1, 2, 3, 4 in RCX, RDX, R8, and R9,
 The fifth and higher arguments are called stack parameters, they will be pushed on the stack
 RSP+28, +30, +32 etc...
@@ -27,12 +24,10 @@ This has the added benefit of storing the number of stack parameters in RCX, bec
 This has even a third benefit, when looping using the REP instruction, RCX gets decremented,
 giving us a 3-for-1 combo = Comparison + Counter + Loop in a single register o//
 
-It's quite a smart solution and I take absolutely zero credit for it, i found this on github
+It's quite a smart solution and I take absolutely zero credit for it, I found this on GitHub
 I tried rewriting it myself but end up rewriting exactly the same stub each time :|
-
                 ___go check janoglezcampos/syscall-rs on GitHub___
 */
-
 global_asm!(
     r#"
 .global syscall_handler
@@ -56,7 +51,7 @@ syscall_handler:
     lea rsi,  [rsp + 0x38]      // Move the address of [rsp + 0x38] in RSI
     lea rdi,  [rsp + 0x28]      // Move the address of [rsp + 0x28] in RDI
 
-    rep movsq                   // Move qword RSI to RDI, repeat RCX times  // Move them down
+    rep movsq                   // Move qword from [RSI] to [RDI], repeat RCX times  // Move every stack parameter "down"
 execute:
     syscall                     // Perform the Syscall
 
@@ -70,14 +65,14 @@ execute:
 extern "C" {
     /// Our wrapper around syscall, imported from the assembly code above
     ///
-    /// Takes the following arguments :
-    ///  - `ssn` : An integer, the System Service Number of the syscall you want to call
-    ///  - `n_args`: An integer, refers to the count of arguments to pass to syscall (excluding these two, which are not passed to syscall)
+    /// Not really made to be called directly, it is better to use the [`thermite::syscall`] macro.
+    ///
+    /// ### Arguments :
+    ///  - `ssn` : 16-bit unsigned int, the System Service Number of the syscall you want to call
+    ///  - `arg_count`: 32-bit unsigned int, refers to the count of arguments to pass to syscall (excluding these two, which are not passed to syscall)
     ///  - ...  -> Then, every argument to pass to the syscall instruction.
-    pub fn syscall_handler(ssn: u16, n_args: u32, ...) -> i32;
+    pub fn syscall_handler(ssn: u16, arg_count: u32, ...) -> i32;
 }
-
-// TODO: Implement variadic macro wrapper around syscall_handler() to compute n_args and fetch ssn
 
 /// Very simple function that reads a SSN from a clean syscall stubs
 ///
@@ -91,7 +86,7 @@ extern "C" {
 /// ```
 /// So we know we can find the SSN in after the MOV EAX instruction, in the 5 and 6th bytes of the function
 /// So if the 4 first bytes are `0x4c`, `0x8b`, `0xd1` and `0xb8`,
-/// We know the fifth byte will be the SSN and we can return it safely
+/// We know the fifth byte will be the SSN, and we can return it safely
 ///
 /// If we don't find these bytes, it's either not a valid syscall address, either a valid syscall which has been modified, by
 /// We cannot recover the SSN so we just return None
@@ -131,14 +126,13 @@ pub fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
 ///  }
 /// ```
 pub fn search(
-    pattern: fn(&&Export) -> bool,
+    filter_fn: fn(&&Export) -> bool,
     find_ssn: fn(*const u8) -> Option<u16>,
 ) -> Result<Vec<Syscall>, DllParserError> {
     let ntdll_handle = unsafe { get_module_address("ntdll.dll") }?;
-
     let ssns = unsafe { get_all_exported_functions(ntdll_handle) }?
         .iter()
-        .filter(pattern)
+        .filter(filter_fn)
         .filter_map(|x| {
             find_ssn(x.address).map(|ssn| Syscall {
                 name: x.name.clone(),
@@ -148,4 +142,95 @@ pub fn search(
         })
         .collect();
     return Ok(ssns);
+}
+
+/// Macro used to generate a search pattern for the `syscalls::search` function.
+///
+/// This call :
+/// ```
+/// thermite::syscall_name_match_any!("NtOpenProcess", "NtAllocateVirtualMemory", "NtWriteVirtualMemory");
+/// ```
+///
+/// Would expand into the following function:
+/// ```
+/// fn filter(x: &&thermite::models::Export) -> bool {
+///     [
+///         "NtOpenProcess",
+///         "NtAllocateVirtualMemory",
+///         "NtWriteVirtualMemory",
+///     ]
+///     .contains(&x.name.as_str())
+/// }
+/// ```
+///
+/// # Example usage:
+/// ```
+/// use thermite::syscalls::{search, simple_get_ssn};
+///
+/// let filter = thermite::syscall_name_match_any!( "NtOpenProcess",
+///                                    "NtAllocateVirtualMemory",
+///                                    "NtWriteVirtualMemory" );
+/// let tmp_vec = search(
+///     filter,
+///     simple_get_ssn,
+/// ).unwrap();
+/// ```
+#[macro_export]
+macro_rules! syscall_name_match_any {
+    ($($name:literal),+) => {
+        {
+            fn filter(x: &&$crate::models::Export) -> bool {
+                static NAMES: &[&str] = &[$($name),+];
+                NAMES.contains(&x.name.as_str())
+            }
+            filter
+        }
+    }
+}
+
+// This macro takes in any two elements separated by a space replace them by the second one
+// Despite what it sounds, it's actually a useful expansion used in `count_args`,
+// it allows us to "consume" arguments to count them, replacing them all with the same type valid expression
+#[macro_export]
+macro_rules! replace_expr {
+    ($_t:tt $sub:expr) => {
+        $sub
+    };
+}
+
+/// Macro that takes an arbitrary number of arguments and "returns" how many.
+///
+/// It is a macro not a function, so it doesn't actually return anything, but expands at compile time into the [`core::slice::len`] function, with an array
+/// containing as many elements as there are arguments passed to the macro.
+#[macro_export]
+macro_rules! count_args {
+    ($($args:expr),* $(,)?) => {
+        {<[()]>::len(&[$($crate::replace_expr!($args ())),*])} as u32
+    }
+}
+
+/// Performs a Windows system call.
+///
+/// This macro will retrieve the syscall number, then call it, passing all the arguments to the system call.
+///
+/// # Arguments:
+///
+/// This macro takes only the name of the syscall as parameter.
+/// The rest of the arguments being those of the specific syscall.
+///
+/// # Example usage:
+///
+/// Demonstrated in the [shellcode injector](src/examples/shellcode_injector.rs) example.
+///
+#[macro_export]
+macro_rules! syscall {
+    ($name:literal $(, $args:expr)* $(,)?) => {
+        unsafe {
+            let x = $crate::syscalls::syscall_handler(
+                $crate::syscalls::search($crate::syscall_name_match_any!($name),$crate::syscalls::simple_get_ssn).unwrap().first().unwrap().ssn,
+                thermite::count_args!($($args),*),
+                $($args),*
+            ); x
+        };
+    }
 }
