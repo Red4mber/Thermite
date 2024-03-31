@@ -1,3 +1,5 @@
-/target
+target
 .idea
 local
+thermite_shellcode
+thermite_shellcode/target/
