@@ -90,7 +90,7 @@ macro_rules! indirect_syscall {
 
 // TODO Refactor that disgusting mess
 pub unsafe fn find_single_syscall_addr() -> *const u8 {
-    let mut iter = get_all_exported_functions(
+    let iter = get_all_exported_functions(
         get_module_address("ntdll.dll").unwrap()
     ).expect("Function not found in the export table");
     let aa = iter.iter().find(|x| {

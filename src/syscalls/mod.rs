@@ -28,7 +28,7 @@ use crate::peb_walk::{get_all_exported_functions, get_function_address, get_modu
 pub fn find_ssn(addr: *const u8) -> Option<u16> {
     match unsafe { ptr::read(addr as *const [u8; 8]) } {
         // Begins with JMP => Probably hooked
-        [0xe9, ..] => {
+        [0xe9, ..] | [_, 0xe9, ..] | [_, _, 0xe9, ..] => {
             return unsafe { halos_gate(addr) };
         },
         [0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00] => {
@@ -137,3 +137,22 @@ pub unsafe fn find_single_ssn(name: &str) -> Option<u16> {
 //     }
 // }
 //
+
+/// Macro to handle the output of the syscalls and cast it as NT_STATUS
+/// Using a homemade NT_STATUS enum i copied from windows headers, it's missing a few values
+///
+/// CAN PANIC
+#[macro_export] macro_rules! syscall_status {
+     ($str:literal, $status:expr) => {{
+        let nt_status: NtStatus = unsafe { mem::transmute($status) };
+        match nt_status {
+            NtStatus::StatusSuccess => {
+                info!("{}: {}", $str, nt_status);
+            }
+            _ => {
+                error!("PANIC ! {} status: {}\nQuitting program...", $str, nt_status);
+                process::exit(nt_status as _);
+            }
+        }
+     }};
+ }

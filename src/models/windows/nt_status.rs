@@ -1,5 +1,12 @@
 use std::fmt::{Display, Formatter};
 
+// The most common ones are
+// 0xc000000d, Invalid Parameter
+// 0x8000000d, Partial Copy
+
+
+
+
 #[allow(overflowing_literals)]
 #[repr(i32)]
 #[derive(Debug, Clone)]

@@ -9,17 +9,16 @@ It is written entirely in Rust and so far I tried as much as possible to make ev
 So far only a small part of this project is complete, but it is already capable to showcase basic malware development
 techniques, such as :
 
-* PEB Walking and enumeration using custom implementatiion of GetModuleHande/GetProcAddress
+* PEB Walking and enumeration using custom implementatiion of GetModuleHandle/GetProcAddress
 * Direct syscalls with dynamic syscall ID retrieval using a mix of techniques such as Hell's Gates and Halo's Gate (see
   in [Examples](./examples/readme.md)).
 * Indirect syscalls, you can now pick between the two by including either one or the other macro, like so :
 
-```rust 
+```rust
 use thermite::indirect_syscall as syscall;
 //or 
 use thermite::direct_syscall as syscall;
 ```
-
 
 ## Usage
 

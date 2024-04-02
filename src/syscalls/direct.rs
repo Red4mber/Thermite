@@ -56,7 +56,7 @@ direct_execute:
 
 #[allow(unused)]
 extern "C" {
-    /// Imported from the assembly code above
+    /// Imported from the assembly stub
     ///
     /// Not really made to be called directly, it is better to use the [`thermite::syscall`] macro.
     ///
@@ -68,16 +68,9 @@ extern "C" {
 }
 
 
-/// Performs a Windows system call.
+/// Performs a direct system call.
 ///
-/// This macro will retrieve the syscall number, then call it, passing all the arguments to the system call.
-///
-/// # Arguments:
-///
-/// This macro takes only the name of the syscall as parameter.
-/// The rest of the arguments being those of the specific syscall.
-///
-/// # Example usage:
+/// This macro will retrieve the syscall number, then perform the syscall, passing it all the arguments.
 ///
 /// Demonstrated in the [shellcode injector](src/examples/shellcode_injector.rs) example.
 ///
