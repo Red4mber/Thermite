@@ -9,14 +9,12 @@ path = "src/lib.rs"
 doc = true
 crate-type = ["lib"]
 
-[[example]]
-name = "shellcode-injector"
-path = "examples/shellcode_injector.rs"
-test = false
-bench = false
-
 [dependencies]
-log = "0.4.21"
+
+
+
+
+
 
 # Not needed I just wanted to learn about cargo profiles
 [profile.release]

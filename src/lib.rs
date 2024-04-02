@@ -26,7 +26,7 @@ macro_rules! _debug_print {
             stringify!($val),
             format!("{:#x?}", $val)
                 .replace("\n ", "\n\t-")
-                .replace(['{', '}', '[', ']'], "")  // Also removing some clutter
+                .replace(['{', '}', '[', ']', ','], "")  // Also removing some clutter
                 .trim()
         );
     };
