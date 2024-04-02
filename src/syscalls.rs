@@ -70,35 +70,32 @@ extern "C" {
     pub fn syscall_handler(ssn: u16, arg_count: u32, ...) -> i32;
 }
 
-/// Very simple function that reads a SSN from a clean syscall stubs
+
+/// Reads the syscall number from a syscall stub.
 ///
-/// # How?
-/// Here's a "virgin" syscall stub, not hooked by an EDR:
-/// ```n
-/// Bytes :                   ;  Asm:
-/// 0x4c 0x8b 0xd1            ;	 mov r10, rcx
-/// 0xb8 0x?? 0x?? 0x00 0x00  ;	 mov eax, 0x?? 0x?? 0x00 0x00
-/// ; <etc...>                ;  <etc...>
-/// ```
-/// So we know we can find the SSN in after the MOV EAX instruction, in the 5 and 6th bytes of the function
-/// So if the 4 first bytes are `0x4c`, `0x8b`, `0xd1` and `0xb8`,
-/// We know the fifth byte will be the SSN, and we can return it safely
+/// Iterates over the bytes of the syscall stub to find the pattern :
+/// `[0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00]`
 ///
-/// If we don't find these bytes, it's either not a valid syscall address, either a valid syscall which has been modified, by
+/// If the pattern matches, we join the two bytes together and return the SSN
+///
+/// If we don't find these bytes, it's either not a valid syscall address, either it has been hooked
 /// We cannot recover the SSN so we just return None
 ///
 /// # Arguments
 ///
 /// - `syscall_addr` : The address of the function we are looking for, can be obtained with [`get_function_address`]
 ///
-pub fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
-    unsafe {
-        if ptr::read(syscall_addr as *const [u8; 4]) == [0x4c, 0x8b, 0xd1, 0xb8] {
-            Some(ptr::read(syscall_addr.add(4)) as u16)
-        } else {
-            None
+pub fn find_ssn(addr: *const u8) -> Option<u16> {
+    for window in unsafe { ptr::read(addr as *const [u8; 32]).windows(8) } {
+        match window {
+            [0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00] => {
+                let ssn = ((*ssn_2 as u16) << 8) + *ssn_1 as u16;
+                return Some(ssn);
+            }
+            _ => {}
         }
     }
+    None
 }
 
 /// Searches for every syscalls using the provided pattern
@@ -111,7 +108,7 @@ pub fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
 /// let ssn_array = unsafe{
 ///      thermite::syscalls::search(|&x| {
 ///         x.name.starts_with("Nt")
-///      }, thermite::syscalls::simple_get_ssn)
+///      }, thermite::syscalls::find_ssn)
 ///  }.unwrap();
 ///
 ///  println!("[^-^] Done! I found {:#?} matching syscalls !", ssn_array.len());
@@ -124,7 +121,7 @@ pub fn search(
     find_ssn: fn(*const u8) -> Option<u16>,
 ) -> Result<Vec<Syscall>, DllParserError> {
     let ntdll_handle = unsafe { get_module_address("ntdll.dll") }?;
-    let ssns = unsafe { get_all_exported_functions(ntdll_handle) }?
+    let ssns: Vec<Syscall> = unsafe { get_all_exported_functions(ntdll_handle) }?
         .iter()
         .filter(filter_fn)
         .filter_map(|x| {
@@ -194,5 +191,5 @@ pub unsafe fn find_single_ssn(name: &str) -> Option<u16> {
     let func_ptr = get_function_address(
         name, get_module_address("ntdll.dll").unwrap()
     ).expect("Function not found in the export table");
-    simple_get_ssn(func_ptr)
+    find_ssn(func_ptr)
 }
