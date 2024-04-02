@@ -35,6 +35,6 @@ lto = true
 opt-level = "s"
 overflow-checks = false
 strip = "symbols"
-debug-assertions = false
+debug-assertions=false
 #panic="abort"
 rpath = false

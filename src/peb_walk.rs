@@ -83,6 +83,7 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllPars
             list_entry.byte_sub(0x10) as *const LDR_DATA_TABLE_ENTRY;
 
         // Get the module's base name as a unicode string (defined in types::peb_teb.rs)
+        // Cast to an actual string is possible due to the fact I implemented fmt::Display for UNICODE_STRING
         let base_dll_name = (*module_base).BaseDllName.to_string();
 
         // If the base name matches the requested module name (case-insensitive)
@@ -287,12 +288,12 @@ pub unsafe fn get_all_exported_functions(
                 // Get the address of the function
                 let rva = address_of_functions[address_of_name_ordinals[i] as usize];
                 let true_address = (base_address as usize + rva as usize) as *const u8;
-	            // Push the functions name and address to the return vector
-	            exported_functions.push(Export {
-		            name: function_name.to_owned(),
-		            address: true_address,
-		            ordinal: address_of_name_ordinals[i],
-	            });
+                // Push the functions name and address to the return vector
+                exported_functions.push(Export {
+                    name: function_name.to_owned(),
+                    address: true_address,
+                    ordinal: address_of_name_ordinals[i],
+                });
             }
             Err(e) => {
                 return Err(DllParserError::FunctionNameParsingError(e));

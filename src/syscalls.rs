@@ -6,9 +6,6 @@ use crate::models::{Export, Syscall};
 use crate::peb_walk::{get_all_exported_functions, get_function_address, get_module_address};
 
 /*
-Parameter 1, 2, 3, 4 in RCX, RDX, R8, and R9,
-The fifth and higher arguments are called stack parameters, they will be pushed on the stack (starting at RSP+28)
-
 Because we cannot dynamically generate the assembly code and execute it at runtime, we need to craft
 a syscall stub that can take the SSN as argument which then causes all the other arguments to end up in the next register.
 (with the SSN now being Arg1, Arg1 becomes Arg2, which in turn ends up as Arg3 etc...)
@@ -39,13 +36,13 @@ syscall_handler:
     mov eax, ecx                // Move the sycall number to RAX
     mov rcx, rdx                // Move the arguments number in RCX
 
-    mov r10, r8                 // Move Arg1 in R10                         // syscall overwrite RCX so Arg1 goes to r10
-    mov rdx, r9                 // Move Arg2 in RDX
-    mov  r8,  [rsp + 0x28]      // Move Arg3 in R8
-    mov  r9,  [rsp + 0x30]      // Move Arg4 in R9
+    mov r10, r8                 // Move syscall Arg1 in R10
+    mov rdx, r9                 // Move syscall Arg2 in RDX
+    mov  r8,  [rsp + 0x28]      // Move syscall Arg3 in R8
+    mov  r9,  [rsp + 0x30]      // Move syscall Arg4 in R9
 
-    sub rcx, 0x4                // Substract 4 from RCX                     // Do we have stack params ?
-    jle execute                 // If zero or less, skip to the end         // If yes
+    sub rcx, 0x4                // Substract 4 from RCX
+    jle execute                 // If zero or less, skip to the end
 
     lea rsi,  [rsp + 0x38]      // Move the address of [rsp + 0x38] in RSI
     lea rdi,  [rsp + 0x28]      // Move the address of [rsp + 0x28] in RDI
@@ -62,7 +59,7 @@ execute:
 
 #[allow(unused)]
 extern "C" {
-    /// Our wrapper around syscall, imported from the assembly code above
+    /// Imported from the assembly code above
     ///
     /// Not really made to be called directly, it is better to use the [`thermite::syscall`] macro.
     ///
@@ -78,7 +75,7 @@ extern "C" {
 /// # How?
 /// Here's a "virgin" syscall stub, not hooked by an EDR:
 /// ```n
-/// Bytes : ________________  ;  Asm:_________
+/// Bytes :                   ;  Asm:
 /// 0x4c 0x8b 0xd1            ;	 mov r10, rcx
 /// 0xb8 0x?? 0x?? 0x00 0x00  ;	 mov eax, 0x?? 0x?? 0x00 0x00
 /// ; <etc...>                ;  <etc...>
@@ -97,10 +94,8 @@ extern "C" {
 pub fn simple_get_ssn(syscall_addr: *const u8) -> Option<u16> {
     unsafe {
         if ptr::read(syscall_addr as *const [u8; 4]) == [0x4c, 0x8b, 0xd1, 0xb8] {
-            // The function is clean
             Some(ptr::read(syscall_addr.add(4)) as u16)
         } else {
-            // The function is hooked, or modified in some way
             None
         }
     }
@@ -143,46 +138,9 @@ pub fn search(
     return Ok(ssns);
 }
 
-/// Macro used to generate a search pattern for the `syscalls::search` function.
-///
-/// This call :
-/// ```
-/// let filter = thermite::syscall_name_match_any!("NtOpenProcess", "NtAllocateVirtualMemory", "NtWriteVirtualMemory");
-/// ```
-///
-/// Would expand into the following function:
-/// ```
-/// let filter = {
-///     fn filter(x: &&thermite::models::Export) -> bool {
-///            static NAMES: &[&str] = &["NtOpenProcess", "NtAllocateVirtualMemory", "NtWriteVirtualMemory"];
-///            NAMES.contains(&x.name.as_str())
-///     }
-/// };
-/// ```
-///
-/// # Example usage:
-/// ```
-/// use thermite::debug;
-/// use thermite::syscalls::{search, simple_get_ssn};
-///
-/// let filter = thermite::syscall_name_match_any!( "NtOpenProcess", "NtAllocateVirtualMemory", "NtWriteVirtualMemory" );
-///  
-/// let tmp_vec = search(
-///     filter,
-///     simple_get_ssn,
-/// ).unwrap();
-/// ```
-#[macro_export]
-macro_rules! syscall_name_match_any {
-    ($($name:literal$(,)?)*) => {{
-        fn filter(x: &&$crate::models::Export) -> bool {  &[$($name),*].contains(&x.name.as_str()) }
-        filter
-    }}
-}
-
 // This macro takes in any two elements separated by a space replace them by the second one
 // Despite what it sounds, it's actually a useful expansion used in `count_args`,
-// it allows us to "consume" arguments to count them, replacing them all with the same type valid expression
+// it allows us to "consume" arguments to count them
 #[macro_export]
 macro_rules! replace_expr {
     ($_t:tt $sub:expr) => {
@@ -219,21 +177,22 @@ macro_rules! syscall {
     ($name:literal $(, $args:expr)* $(,)?) => {
          unsafe {
             $crate::syscalls::syscall_handler(
-                $crate::syscalls::find_ssn($name).unwrap(),
-                thermite::count_args!($($args),*), $($args),*
+                $crate::syscalls::find_single_ssn($name).unwrap(),
+                thermite::count_args!($($args),*),
+                $($args),*
             )
         };
     }
 }
-pub unsafe fn find_ssn(name: &str) -> Option<u16> {
-	let func_ptr = get_function_address(
-		name, get_module_address("ntdll.dll").unwrap(),
-	).expect("Function not found in the export table");
 
-	if *(func_ptr as *const [u8; 4]) == [0x4c, 0x8b, 0xd1, 0xb8] {
-		let ssn_ptr = ((func_ptr as usize) + 4) as (*const u16);
-		Some(*ssn_ptr)
-	} else {
-		None
-	}
+/// Helper function to find a single SSN from a syscall name
+///
+/// First finds the address of the ntdll.dll module
+/// Then finds the function address in the exports table
+/// Then tries to read the syscall number from the bytes of the function
+pub unsafe fn find_single_ssn(name: &str) -> Option<u16> {
+    let func_ptr = get_function_address(
+        name, get_module_address("ntdll.dll").unwrap()
+    ).expect("Function not found in the export table");
+    simple_get_ssn(func_ptr)
 }

