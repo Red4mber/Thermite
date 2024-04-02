@@ -10,6 +10,11 @@ pub struct Syscall {
 }
 
 /// Represents a function in the export table of a DLL
+/// Each [Export] struct contains the following fields:
+///
+/// * `name` - The name of the exported function (`String`).
+/// * `address` - The address of the exported function (`*const u8`).
+/// * `ordinal` - The ordinal number of the exported function (`u16`).
 #[derive(Debug, Clone)]
 pub struct Export {
     pub name: String,

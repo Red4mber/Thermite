@@ -3,12 +3,11 @@ use std::ptr;
 
 use crate::error::DllParserError;
 use crate::models::{Export, Syscall};
-use crate::peb_walk::{get_all_exported_functions, get_module_address};
+use crate::peb_walk::{get_all_exported_functions, get_function_address, get_module_address};
 
 /*
 Parameter 1, 2, 3, 4 in RCX, RDX, R8, and R9,
-The fifth and higher arguments are called stack parameters, they will be pushed on the stack
-RSP+28, +30, +32 etc...
+The fifth and higher arguments are called stack parameters, they will be pushed on the stack (starting at RSP+28)
 
 Because we cannot dynamically generate the assembly code and execute it at runtime, we need to craft
 a syscall stub that can take the SSN as argument which then causes all the other arguments to end up in the next register.
@@ -148,28 +147,26 @@ pub fn search(
 ///
 /// This call :
 /// ```
-/// thermite::syscall_name_match_any!("NtOpenProcess", "NtAllocateVirtualMemory", "NtWriteVirtualMemory");
+/// let filter = thermite::syscall_name_match_any!("NtOpenProcess", "NtAllocateVirtualMemory", "NtWriteVirtualMemory");
 /// ```
 ///
 /// Would expand into the following function:
 /// ```
-/// fn filter(x: &&thermite::models::Export) -> bool {
-///     [
-///         "NtOpenProcess",
-///         "NtAllocateVirtualMemory",
-///         "NtWriteVirtualMemory",
-///     ]
-///     .contains(&x.name.as_str())
-/// }
+/// let filter = {
+///     fn filter(x: &&thermite::models::Export) -> bool {
+///            static NAMES: &[&str] = &["NtOpenProcess", "NtAllocateVirtualMemory", "NtWriteVirtualMemory"];
+///            NAMES.contains(&x.name.as_str())
+///     }
+/// };
 /// ```
 ///
 /// # Example usage:
 /// ```
+/// use thermite::debug;
 /// use thermite::syscalls::{search, simple_get_ssn};
 ///
-/// let filter = thermite::syscall_name_match_any!( "NtOpenProcess",
-///                                    "NtAllocateVirtualMemory",
-///                                    "NtWriteVirtualMemory" );
+/// let filter = thermite::syscall_name_match_any!( "NtOpenProcess", "NtAllocateVirtualMemory", "NtWriteVirtualMemory" );
+///  
 /// let tmp_vec = search(
 ///     filter,
 ///     simple_get_ssn,
@@ -177,15 +174,10 @@ pub fn search(
 /// ```
 #[macro_export]
 macro_rules! syscall_name_match_any {
-    ($($name:literal),+) => {
-        {
-            fn filter(x: &&$crate::models::Export) -> bool {
-                static NAMES: &[&str] = &[$($name),+];
-                NAMES.contains(&x.name.as_str())
-            }
-            filter
-        }
-    }
+    ($($name:literal$(,)?)*) => {{
+        fn filter(x: &&$crate::models::Export) -> bool {  &[$($name),*].contains(&x.name.as_str()) }
+        filter
+    }}
 }
 
 // This macro takes in any two elements separated by a space replace them by the second one
@@ -225,12 +217,23 @@ macro_rules! count_args {
 #[macro_export]
 macro_rules! syscall {
     ($name:literal $(, $args:expr)* $(,)?) => {
-        unsafe {
-            let x = $crate::syscalls::syscall_handler(
-                $crate::syscalls::search($crate::syscall_name_match_any!($name),$crate::syscalls::simple_get_ssn).unwrap().first().unwrap().ssn,
-                thermite::count_args!($($args),*),
-                $($args),*
-            ); x
+         unsafe {
+            $crate::syscalls::syscall_handler(
+                $crate::syscalls::find_ssn($name).unwrap(),
+                thermite::count_args!($($args),*), $($args),*
+            )
         };
     }
+}
+pub unsafe fn find_ssn(name: &str) -> Option<u16> {
+	let func_ptr = get_function_address(
+		name, get_module_address("ntdll.dll").unwrap(),
+	).expect("Function not found in the export table");
+
+	if *(func_ptr as *const [u8; 4]) == [0x4c, 0x8b, 0xd1, 0xb8] {
+		let ssn_ptr = ((func_ptr as usize) + 4) as (*const u16);
+		Some(*ssn_ptr)
+	} else {
+		None
+	}
 }

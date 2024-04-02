@@ -451,9 +451,8 @@ pub struct UNICODE_STRING {
     pub MaximumLength: u16,
     pub Buffer: *const u16,
 }
-//
 // I swear, I'm going to put a head sized hole in my desk if I ever have
-// to implement fmt::Display and Debug for a string
+// to implement fmt::Display and Debug for a string ever again
 impl fmt::Display for UNICODE_STRING {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let buffer = unsafe {
