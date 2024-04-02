@@ -1,5 +1,6 @@
 use std::arch::global_asm;
 use std::ptr;
+use thermite::debug;
 
 use crate::error::DllParserError;
 use crate::info;
@@ -87,15 +88,18 @@ extern "C" {
 /// - `syscall_addr` : The address of the function we are looking for, can be obtained with [`get_function_address`]
 ///
 pub fn find_ssn(addr: *const u8) -> Option<u16> {
-    for window in unsafe { ptr::read(addr as *const [u8; 32]).windows(8) } {
-        match window {
-            [0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00] => {
-                let ssn = ((*ssn_2 as u16) << 8) + *ssn_1 as u16;
-                return Some(ssn);
-            }
-            _ => {}
+    match unsafe { ptr::read(addr as *const [u8; 8]) } {
+        [0xe9, ..] => {
+            // Unconditional jump detected, this syscall is probably hooked
+            return unsafe { halos_gate(addr) };
         }
+        [0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00] => {
+            let ssn = ((ssn_2 as u16) << 8) + ssn_1 as u16;
+            return Some(ssn);
+        }
+        _ => {}
     }
+
     None
 }
 
@@ -104,23 +108,21 @@ pub fn find_ssn(addr: *const u8) -> Option<u16> {
 /// Then subtract(or add, depending on the direction) the number of functions hopped to get the ssn
 /// This method only work if syscall are incrementally numbered
 unsafe fn halos_gate(addr: *const u8) -> Option<u16> {
-    find_ssn(addr).or_else(|| {
-        for i in 1..500 {
-            let up = find_ssn(addr.byte_offset(32 * i));
-            if up.is_some() {
-                let ssn = up.unwrap() - i as u16;
-                info!("Found clean syscall {} functions up!", i);
-                return Some(ssn)
-            }
-            let down = find_ssn(addr.byte_offset(-32 * i));
-            if down.is_some() {
-                let ssn = down.unwrap() + i as u16;
-                info!("Found clean syscall {} functions down!", i);
-                return Some(ssn)
-            }
+    for i in 1..500 {
+        let up = find_ssn(addr.byte_offset(32 * i));
+        if up.is_some() {
+            let ssn = up.unwrap() - i as u16;
+            info!("Found clean syscall {} functions up at address {:x?}!", i, addr);
+            return Some(ssn)
         }
-        None
-    })
+        let down = find_ssn(addr.byte_offset(-32 * i));
+        if down.is_some() {
+            let ssn = down.unwrap() + i as u16;
+            info!("Found clean syscall {} functions down at address {:x?} !", i, addr);
+            return Some(ssn)
+        }
+    }
+    None
 }
 
 
@@ -147,7 +149,7 @@ pub fn search(
     find_ssn: fn(*const u8) -> Option<u16>,
 ) -> Result<Vec<Syscall>, DllParserError> {
     let ntdll_handle = unsafe { get_module_address("ntdll.dll") }?;
-    let ssns: Vec<Syscall> = unsafe { get_all_exported_functions(ntdll_handle) }?
+    let result: Vec<Syscall> = unsafe { get_all_exported_functions(ntdll_handle) }?
         .iter()
         .filter(filter_fn)
         .filter_map(|x| {
@@ -158,7 +160,7 @@ pub fn search(
             })
         })
         .collect();
-    return Ok(ssns);
+    return Ok(result);
 }
 
 // This macro takes in any two elements separated by a space replace them by the second one
