@@ -21,21 +21,22 @@ unsafe fn deny_addresses(addr: *const u8) -> Option<*const u8> {
 
 
 // Check if we can find a SSN in this function
-unsafe fn find_ssn(addr: *const u8) -> Option<u16> {
-	if deny_addresses(addr).is_none() { return None }       // For test purposes only
-
-	for win in ptr::read(addr as *const [u8; 32]).windows(8) {
-		match win {
-			[0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00] => {
-				let ssn = ((*ssn_2 as u16) << 8) + *ssn_1 as u16;
-				return Some(ssn);
-			}
-			_ => {}
+pub fn find_ssn(addr: *const u8) -> Option<u16> {
+	unsafe { if deny_addresses(addr).is_none() { return None } }       // For test purposes only
+	match unsafe { ptr::read(addr as *const [u8; 8]) } {
+		// Begins with JMP => Probably hooked
+		[0xe9, ..] => {
+			return unsafe { halos_gate(addr) };
+		},
+		[0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00] => {
+			let ssn = ((ssn_2 as u16) << 8) + ssn_1 as u16;
+			return Some(ssn);
 		}
+		_ => {}
 	}
+
 	None
 }
-
 
 /// If a syscall is hooked, seek up and down until it finds a clean syscall
 /// Then subtract(or add, depending on the direction) the number of functions hopped to get the ssn
@@ -43,18 +44,14 @@ unsafe fn find_ssn(addr: *const u8) -> Option<u16> {
 unsafe fn halos_gate(addr: *const u8) -> Option<u16> {
 	find_ssn(addr).or_else(|| {
 		for i in 1..500 {
-			let up = find_ssn(addr.byte_offset(32 * i));
-			if up.is_some() {
-				let ssn = up.unwrap() - i as u16;
-				info!("Found clean syscall {} functions up!", i);
-				return Some(ssn)
-			}
-			let down = find_ssn(addr.byte_offset(-32 * i));
-			if down.is_some() {
-				let ssn = down.unwrap() + i as u16;
-				info!("Found clean syscall {} functions down!", i);
-				return Some(ssn)
-			}
+			let up = find_ssn(addr.byte_offset(32 * i)).and_then(|up| {
+				up.unwrap() - i as u16
+			});
+			if up.is_some() { return up }
+			let down = find_ssn(addr.byte_offset(-32 * i)).and_then(|down| {
+				down.unwrap() + i as u16
+			});
+			if down.is_some() { return down }
 		}
 		None
 	})

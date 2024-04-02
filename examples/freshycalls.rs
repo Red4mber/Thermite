@@ -1,4 +1,3 @@
-use std::ops::Not;
 use thermite::{debug, error, info};
 use thermite::models::{Export, Syscall};
 use thermite::peb_walk::{get_all_exported_functions, get_function_address, get_module_address};
@@ -30,7 +29,7 @@ fn main() {
 
 	// Let get a control array, numbered using our "find_ssn" function, as usual
 	let verif_binding = unsafe { get_all_exported_functions(ntdll_handle) }.unwrap();
-	let mut verif_all_exports: Vec<&Export> = verif_binding
+	let verif_all_exports: Vec<&Export> = verif_binding
 		.iter()
 		.filter(|x1| x1.name.starts_with("Nt") && !x1.name.starts_with("Ntdll"))
 		.collect();
@@ -50,6 +49,6 @@ fn main() {
 	// Using filter_map, we keep only those who aren't correct, then print is using error
 	// If everything goes well, we should see any errors o/
 	let _: Vec<_> = guessed_syscalls.iter().zip(control.iter_mut()).filter_map(|(x1, &mut ref x2)| {
-		x1.ssn.eq(&x2.ssn).not().then(|| (x1, x2))
+		x1.ssn.ne(&x2.ssn).then(|| (x1, x2))
 	}).map(|x| error!("{:#x?}", x)).collect();
 }
