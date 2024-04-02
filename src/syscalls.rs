@@ -2,6 +2,7 @@ use std::arch::global_asm;
 use std::ptr;
 
 use crate::error::DllParserError;
+use crate::info;
 use crate::models::{Export, Syscall};
 use crate::peb_walk::{get_all_exported_functions, get_function_address, get_module_address};
 
@@ -97,6 +98,31 @@ pub fn find_ssn(addr: *const u8) -> Option<u16> {
     }
     None
 }
+
+
+/// If a syscall is hooked, seek up and down until it finds a clean syscall
+/// Then subtract(or add, depending on the direction) the number of functions hopped to get the ssn
+/// This method only work if syscall are incrementally numbered
+unsafe fn halos_gate(addr: *const u8) -> Option<u16> {
+    find_ssn(addr).or_else(|| {
+        for i in 1..500 {
+            let up = find_ssn(addr.byte_offset(32 * i));
+            if up.is_some() {
+                let ssn = up.unwrap() - i as u16;
+                info!("Found clean syscall {} functions up!", i);
+                return Some(ssn)
+            }
+            let down = find_ssn(addr.byte_offset(-32 * i));
+            if down.is_some() {
+                let ssn = down.unwrap() + i as u16;
+                info!("Found clean syscall {} functions down!", i);
+                return Some(ssn)
+            }
+        }
+        None
+    })
+}
+
 
 /// Searches for every syscalls using the provided pattern
 /// It then executes the find_ssn function on every one of them to retrieve their syscall numbers
