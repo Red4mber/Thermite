@@ -45,5 +45,13 @@ This example also includes code to verify the IDs are valid.
 cargo run --package thermite --example freshycalls.rs
 ```
 
+### [ETW Patcher](/examples/etw_patcher.rs)
 
+Work in progress
 
+This example aims to demonstrate current techniques for bypassing ETW.
+So far only the most basic local ETW patching has been implemented, but the other should arrive soon.
+
+```bash
+cargo run --package thermite --example etw_patching.rs
+```
