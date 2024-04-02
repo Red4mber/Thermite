@@ -34,7 +34,6 @@ pub fn find_ssn(addr: *const u8) -> Option<u16> {
 		}
 		_ => {}
 	}
-
 	None
 }
 

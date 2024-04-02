@@ -12,8 +12,14 @@ techniques, such as :
 * PEB Walking and enumeration using custom implementatiion of GetModuleHande/GetProcAddress
 * Direct syscalls with dynamic syscall ID retrieval using a mix of techniques such as Hell's Gates and Halo's Gate (see
   in [Examples](./examples/readme.md)).
+* Indirect syscalls, you can now pick between the two by including either one or the other macro, like so :
 
-I am currently working on implementing indirect system calls, and will probably publish it soon.
+```rust 
+use thermite::indirect_syscall as syscall;
+//or 
+use thermite::direct_syscall as syscall;
+```
+
 
 ## Usage
 
