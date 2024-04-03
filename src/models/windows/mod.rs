@@ -7,7 +7,6 @@ use std::ffi::c_void;
 
 use crate::models::windows::peb_teb::UNICODE_STRING;
 
-
 /// Stuff to deal with the PEB and TEB structures in windows
 /// Rather incomplete but also the less used of the two
 pub mod peb_teb;
