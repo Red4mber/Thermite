@@ -23,8 +23,8 @@ lto = true              # Link Time Optimization. Produces better optimized code
 opt-level = "s"         # just S because Z is not that smaller and loop vectorization is cool
 overflow-checks = false # When overflow-checks are enabled, a panic will occur on overflow.
 strip = "symbols"       # Equivalent to strip = true  # Max strip level 
-debug-assertions=false  # Disable debug assertion, no cool in release 
-panic="abort"           # Only two valid options and I don't want unwind
+debug-assertions = false  # Disable debug assertion, no cool in release
+panic = "abort"           # Only two valid options and I don't want unwind
 rpath = false           # Disables the runtime search path to find required libraries
 
 [profile.dev]
@@ -33,6 +33,6 @@ lto = true
 opt-level = "s"
 overflow-checks = false
 strip = "symbols"
-debug-assertions=false
+debug-assertions = false
 #panic="abort"
 rpath = false

@@ -1,3 +1,6 @@
+// Needed because macros are broken
+extern crate self as thermite;
+
 
 pub mod error;
 pub mod models;
@@ -5,14 +8,13 @@ pub mod peb_walk;
 
 pub mod syscalls;
 
-// Needed because macros are broken
-extern crate self as thermite;
-
-
 
 //
 // Below are my own macros for debugging/logging
 //
+// They're not that good, they certainly aren't better than the log crate, but they're mine
+// I tried to make them as similar as possible with log:: so that you wouldn't have too much code to change if you want to change
+
 
 // Prints stuff, offset by one tab, to stay aligned with the nice headers
 #[macro_export]

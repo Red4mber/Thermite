@@ -3,6 +3,15 @@ use thermite::models::{Export, Syscall};
 use thermite::peb_walk::{get_all_exported_functions, get_function_address, get_module_address};
 use thermite::syscalls::find_ssn;
 
+/* This example is a demonstration of FreshyCalls's technique to retrieve hooked syscall IDs.
+
+Since on most versions of windows, all syscalls are in order, we can easily derive the syscall ID from their addresses.
+We only need to find every syscalls and sort our list of syscalls using their addresses.
+When this is done, we can observe that all the SSNs are in order as well.
+
+As a demonstration i created a second array that i populated using data from our usual find_ssn() function,
+to make sure the SSN we found we all valid, and lo and behold, they all were.
+*/
 
 fn main() {
 	// First we get an array of every function exported by ntdll starting by "Nt"
@@ -16,14 +25,15 @@ fn main() {
 	// We sort every function by its address
 	all_exports.sort_by(|a, b| a.address.cmp(&b.address));
 	// We then simply number every function
-	let guessed_syscalls: Vec<Syscall> = all_exports.iter().enumerate()
-	                                                .map(|(idx, &ex)| {
-		                                                Syscall {
-			                                                address: ex.address,
-			                                                name: ex.name.clone(),
-			                                                ssn: idx as u16,
-		                                                }
-	                                                }).collect();
+	let guessed_syscalls: Vec<Syscall> =
+		all_exports.iter().enumerate()
+		           .map(|(idx, &ex)| {
+			           Syscall {
+				           address: ex.address,
+				           name: ex.name.clone(),
+				           ssn: idx as u16,
+			           }
+		           }).collect();
 	// Because SSNs are numbered incrementally, they should all have the correct SSN
 
 

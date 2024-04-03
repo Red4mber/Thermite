@@ -1,8 +1,9 @@
 # Examples
 
 This project comes with multiple examples aiming to demonstrate various techniques and capabilities of this library.
-Some examples are there only as "notes" so that i can keep a trace of techniques or stuff that i learned, you're still
-free to check them out although they might be less interesting.
+Some examples are there only as "notes" so that i can keep a trace of techniques or stuff that i learned,
+while others are "scratchpads" or sketches of functionnalities i plan to add in the library but would like to work on a
+little before commiting to it.
 
 All of the examples here can be compiled and launched using cargo from the root directory of this project.
 

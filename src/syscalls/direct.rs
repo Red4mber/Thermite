@@ -1,6 +1,5 @@
 use std::arch::global_asm;
 
-
 /*
 Because we cannot dynamically generate the assembly code and execute it at runtime, we need to craft
 a syscall stub that can take the SSN as argument which then causes all the other arguments to end up in the next register.
@@ -38,7 +37,7 @@ direct_stub:
     mov  r9,  [rsp + 0x30]      // Move syscall Arg4 in R9
 
     sub rcx, 0x4                // Substract 4 from RCX
-    jle direct_execute                 // If zero or less, skip to the end
+    jle direct_execute          // If zero or less, skip to the end
 
     lea rsi,  [rsp + 0x38]      // Move the address of [rsp + 0x38] in RSI
     lea rdi,  [rsp + 0x28]      // Move the address of [rsp + 0x28] in RDI
@@ -78,12 +77,12 @@ extern "C" {
 macro_rules! direct_syscall {
     ($name:literal $(, $args:expr)* $(,)?) => {
          unsafe {
-            $crate::syscalls::direct::direct_stub(
+            let _status = $crate::syscalls::direct::direct_stub(
                 $crate::syscalls::find_single_ssn($name).unwrap(),
                 thermite::count_args!($($args),*),
-                $($args),*
-            )
-        };
+                $($args),* );
+            mem::transmute::<i32, $crate::models::windows::nt_status::NtStatus>(_status)
+        }
     }
 }
 

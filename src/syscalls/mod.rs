@@ -1,14 +1,13 @@
 use std::ptr;
 
-
-pub mod direct;
-pub mod indirect;
-
-
 use crate::error::DllParserError;
 use crate::info;
 use crate::models::{Export, Syscall};
 use crate::peb_walk::{get_all_exported_functions, get_function_address, get_module_address};
+
+
+pub mod direct;
+pub mod indirect;
 
 
 /// Reads the syscall number from a syscall stub.
@@ -26,19 +25,19 @@ use crate::peb_walk::{get_all_exported_functions, get_function_address, get_modu
 /// - `syscall_addr` : The address of the function we are looking for, can be obtained with [`get_function_address`]
 ///
 pub fn find_ssn(addr: *const u8) -> Option<u16> {
-    match unsafe { ptr::read(addr as *const [u8; 8]) } {
-        // Begins with JMP => Probably hooked
-        [0xe9, ..] | [_, 0xe9, ..] | [_, _, 0xe9, ..] => {
-            return unsafe { halos_gate(addr) };
-        },
-        [0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00] => {
-            let ssn = ((ssn_2 as u16) << 8) + ssn_1 as u16;
-            return Some(ssn);
-        }
-        _ => {}
-    }
+	match unsafe { ptr::read(addr as *const [u8; 8]) } {
+		// Begins with JMP => Probably hooked
+		[0xe9, ..] | [_, 0xe9, ..] | [_, _, 0xe9, ..] => {
+			return unsafe { halos_gate(addr) };
+		}
+		[0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00] => {
+			let ssn = ((ssn_2 as u16) << 8) + ssn_1 as u16;
+			return Some(ssn);
+		}
+		_ => {}
+	}
 
-    None
+	None
 }
 
 
@@ -46,21 +45,21 @@ pub fn find_ssn(addr: *const u8) -> Option<u16> {
 /// Then subtract(or add, depending on the direction) the number of functions hopped to get the ssn
 /// This method only work if syscall are incrementally numbered
 pub unsafe fn halos_gate(addr: *const u8) -> Option<u16> {
-    for i in 1..500 {
-        let up = find_ssn(addr.byte_offset(32 * i));
-        if up.is_some() {
-            let ssn = up.unwrap() - i as u16;
-            info!("Found clean syscall {} functions up at address {:x?}!", i, addr);
-            return Some(ssn)
-        }
-        let down = find_ssn(addr.byte_offset(-32 * i));
-        if down.is_some() {
-            let ssn = down.unwrap() + i as u16;
-            info!("Found clean syscall {} functions down at address {:x?} !", i, addr);
-            return Some(ssn)
-        }
-    }
-    None
+	for i in 1..500 {
+		let up = find_ssn(addr.byte_offset(32 * i));
+		if up.is_some() {
+			let ssn = up.unwrap() - i as u16;
+			info!("Found clean syscall {} functions up at address {:x?}!", i, addr);
+			return Some(ssn);
+		}
+		let down = find_ssn(addr.byte_offset(-32 * i));
+		if down.is_some() {
+			let ssn = down.unwrap() + i as u16;
+			info!("Found clean syscall {} functions down at address {:x?} !", i, addr);
+			return Some(ssn);
+		}
+	}
+	None
 }
 
 
@@ -70,22 +69,22 @@ pub unsafe fn halos_gate(addr: *const u8) -> Option<u16> {
 /// Returns a vector of [Syscall] containing the matches
 ///
 pub fn search(
-    filter_fn: fn(&&Export) -> bool,
-    find_ssn: fn(*const u8) -> Option<u16>,
+	filter_fn: fn(&&Export) -> bool,
+	find_ssn: fn(*const u8) -> Option<u16>,
 ) -> Result<Vec<Syscall>, DllParserError> {
-    let ntdll_handle = unsafe { get_module_address("ntdll.dll") }?;
-    let result: Vec<Syscall> = unsafe { get_all_exported_functions(ntdll_handle) }?
-        .iter()
-        .filter(filter_fn)
-        .filter_map(|x| {
-            find_ssn(x.address).map(|ssn| Syscall {
-                name: x.name.clone(),
-                address: x.address,
-                ssn,
-            })
-        })
-        .collect();
-    return Ok(result);
+	let ntdll_handle = unsafe { get_module_address("ntdll.dll") }?;
+	let result: Vec<Syscall> = unsafe { get_all_exported_functions(ntdll_handle) }?
+		.iter()
+		.filter(filter_fn)
+		.filter_map(|x| {
+			find_ssn(x.address).map(|ssn| Syscall {
+				name: x.name.clone(),
+				address: x.address,
+				ssn,
+			})
+		})
+		.collect();
+	return Ok(result);
 }
 
 // This macro takes in any two elements separated by a space replace them by the second one
@@ -116,43 +115,31 @@ macro_rules! count_args {
 /// Then finds the function address in the exports table
 /// Then tries to read the syscall number from the bytes of the function
 pub unsafe fn find_single_ssn(name: &str) -> Option<u16> {
-    let func_ptr = get_function_address(
-        name, get_module_address("ntdll.dll").unwrap(),
-    ).expect("Function not found in the export table");
-    find_ssn(func_ptr)
+	let func_ptr = get_function_address(
+		name, get_module_address("ntdll.dll").unwrap(),
+	).expect("Function not found in the export table");
+	find_ssn(func_ptr)
 }
 
 
-// #[macro_export]
-// macro_rules! syscall {
-//     ($name:literal $(, $args:expr)* $(,)?) => {
-//          unsafe { $crate::direct_syscall!( $name, $($args),* ) };
-//     }
-// }
-
-// #[macro_export]
-// macro_rules! syscall {
-//     ($name:literal $(, $args:expr)* $(,)?) => {
-//          unsafe { $crate::indirect_syscall!( $name, $($args),* ) };
-//     }
-// }
-//
-
-/// Macro to handle the output of the syscalls and cast it as NT_STATUS
-/// Using a homemade NT_STATUS enum i copied from windows headers, it's missing a few values
-///
-/// CAN PANIC
-#[macro_export] macro_rules! syscall_status {
-     ($str:literal, $status:expr) => {{
-        let nt_status: NtStatus = unsafe { mem::transmute($status) };
-        match nt_status {
-            NtStatus::StatusSuccess => {
-                info!("{}: {}", $str, nt_status);
-            }
-            _ => {
-                error!("PANIC ! {} status: {}\nQuitting program...", $str, nt_status);
-                process::exit(nt_status as _);
-            }
-        }
-     }};
- }
+// /// Macro to handle the output of the syscalls and cast it as NT_STATUS
+// /// Using a homemade NT_STATUS enum i copied from windows headers, it's missing a few values
+// ///
+// /// WARNING It can, and WILL panic
+// #[macro_export] macro_rules! check_status {
+//      ($str:literal, $status:expr) => {{
+//         let nt_status: NtStatus = unsafe { mem::transmute($status) };
+//         match nt_status {
+//             NtStatus::StatusSuccess => {
+//                 info!("{}: {}", $str, nt_status);
+//             },
+//             NtStatus::StatusInfoLengthMismatch => {
+//                 info!("{}: {}", $str, nt_status);
+//             },
+//             _ => {
+//                 error!("PANIC ! {} status: {}\nQuitting program...", $str, nt_status);
+//                 process::exit(nt_status as _);
+//             }
+//         }
+//      }};
+//  }

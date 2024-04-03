@@ -1,14 +1,15 @@
-use crate::models::Export;
 use std::arch::asm;
 use std::ffi::CStr;
 use std::slice;
 
 use crate::error::DllParserError;
+use crate::models::Export;
+use crate::models::Module;
 use crate::models::windows::pe_file_format::{
     IMAGE_EXPORT_DIRECTORY, IMAGE_NT_HEADERS, IMAGE_NT_SIGNATURE,
 };
 use crate::models::windows::peb_teb::{LDR_DATA_TABLE_ENTRY, PEB};
-use crate::models::Module;
+
 
 /// This function uses inline assembly to retrieve the PEB address from the appropriate
 /// Thread Environment Block (TEB) field based on the target architecture .
@@ -23,24 +24,25 @@ use crate::models::Module;
 /// Only supports x86 or x86_64
 ///
 pub unsafe fn get_peb_address() -> *const PEB {
-    #[inline(always)]
-    fn read_peb_ptr() -> *const PEB {
-        #[cfg(target_arch = "x86")]
-        unsafe {
-            let peb: *const PEB;
-            asm!("mov eax, fs:[0x30]", out("eax") peb, options(nomem, nostack, preserves_flags));
-            peb
-        }
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            let peb: *const PEB;
-            asm!("mov rax, gs:[0x60]", out("rax") peb, options(nomem, nostack, preserves_flags));
-            peb
-        }
-    }
-    let peb_ptr = read_peb_ptr();
-    &*(peb_ptr)
+	#[inline(always)]
+	fn read_peb_ptr() -> *const PEB {
+		#[cfg(target_arch = "x86")]
+		unsafe {
+			let peb: *const PEB;
+			asm!("mov eax, fs:[0x30]", out("eax") peb, options(nomem, nostack, preserves_flags));
+			peb
+		}
+		#[cfg(target_arch = "x86_64")]
+		unsafe {
+			let peb: *const PEB;
+			asm!("mov rax, gs:[0x60]", out("rax") peb, options(nomem, nostack, preserves_flags));
+			peb
+		}
+	}
+	let peb_ptr = read_peb_ptr();
+	&*(peb_ptr)
 }
+
 
 /// Returns the address of a loaded DLL
 ///
@@ -62,41 +64,42 @@ pub unsafe fn get_peb_address() -> *const PEB {
 /// };
 /// ```
 pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllParserError> {
-    // Get the address of the Process Environment Block (PEB)
-    let peb = get_peb_address();
+	// Get the address of the Process Environment Block (PEB)
+	let peb = get_peb_address();
 
-    // Get a reference to the PEB 's Loader Data
-    let ldr = (*peb).Ldr;
+	// Get a reference to the PEB 's Loader Data
+	let ldr = (*peb).Ldr;
 
-    // Get a reference to the InMemoryOrderModuleList's head and tail
-    let mut list_entry = (*ldr).InMemoryOrderModuleList.Flink;
-    let last_module = (*ldr).InMemoryOrderModuleList.Blink;
+	// Get a reference to the InMemoryOrderModuleList's head and tail
+	let mut list_entry = (*ldr).InMemoryOrderModuleList.Flink;
+	let last_module = (*ldr).InMemoryOrderModuleList.Blink;
 
-    loop {
-        // If we've reached the end of the list, the module was not found
-        if list_entry == last_module {
-            return Err(DllParserError::ModuleNotFound);
-        }
+	loop {
+		// If we've reached the end of the list, the module was not found
+		if list_entry == last_module {
+			return Err(DllParserError::ModuleNotFound);
+		}
 
-        // Get a reference to the current module's LDR_DATA_TABLE_ENTRY
-        let module_base: *const LDR_DATA_TABLE_ENTRY =
-            list_entry.byte_sub(0x10) as *const LDR_DATA_TABLE_ENTRY;
+		// Get a reference to the current module's LDR_DATA_TABLE_ENTRY
+		let module_base: *const LDR_DATA_TABLE_ENTRY =
+			list_entry.byte_sub(0x10) as *const LDR_DATA_TABLE_ENTRY;
 
-        // Get the module's base name as a unicode string (defined in types::peb_teb.rs)
-        // Cast to an actual string is possible due to the fact I implemented fmt::Display for UNICODE_STRING
-        let base_dll_name = (*module_base).BaseDllName.to_string();
+		// Get the module's base name as a unicode string (defined in types::peb_teb.rs)
+		// Cast to an actual string is possible due to the fact I implemented fmt::Display for UNICODE_STRING
+		let base_dll_name = (*module_base).BaseDllName.to_string();
 
-        // If the base name matches the requested module name (case-insensitive)
-        if base_dll_name.eq_ignore_ascii_case(module_name) {
-            // Get the module's base address and return it
-            let module_base_address = (*module_base).DllBase;
-            return Ok(module_base_address as *const u8);
-        }
+		// If the base name matches the requested module name (case-insensitive)
+		if base_dll_name.eq_ignore_ascii_case(module_name) {
+			// Get the module's base address and return it
+			let module_base_address = (*module_base).DllBase;
+			return Ok(module_base_address as *const u8);
+		}
 
-        // Move to the next module in the list
-        list_entry = (*list_entry).Flink;
-    }
+		// Move to the next module in the list
+		list_entry = (*list_entry).Flink;
+	}
 }
+
 
 ///
 /// Retrieves a list of all modules loaded in memory.
@@ -122,76 +125,78 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllPars
 /// println!("[^-^] Loaded Modules : {:#?}", all_modules);
 /// ```
 pub unsafe fn list_modules() -> Result<Vec<Module>, DllParserError> {
-    let loader_info = (*get_peb_address()).Ldr;
-    let mut list_entry = (*loader_info).InMemoryOrderModuleList.Flink;
-    let last_module = (*loader_info).InMemoryOrderModuleList.Blink;
-    let mut loaded_modules: Vec<Module> = vec![];
-    loop {
-        let module_base: *const LDR_DATA_TABLE_ENTRY =
-            list_entry.byte_sub(0x10) as *const LDR_DATA_TABLE_ENTRY;
+	let loader_info = (*get_peb_address()).Ldr;
+	let mut list_entry = (*loader_info).InMemoryOrderModuleList.Flink;
+	let last_module = (*loader_info).InMemoryOrderModuleList.Blink;
+	let mut loaded_modules: Vec<Module> = vec![];
+	loop {
+		let module_base: *const LDR_DATA_TABLE_ENTRY =
+			list_entry.byte_sub(0x10) as *const LDR_DATA_TABLE_ENTRY;
 
-        loaded_modules.push(Module {
-            name: (*module_base).BaseDllName.to_string(),
-            address: (*module_base).DllBase as *const u8,
-        });
+		loaded_modules.push(Module {
+			name: (*module_base).BaseDllName.to_string(),
+			address: (*module_base).DllBase as *const u8,
+		});
 
-        if list_entry == last_module {
-            return Ok(loaded_modules);
-        }
-        list_entry = (*list_entry).Flink;
-    }
+		if list_entry == last_module {
+			return Ok(loaded_modules);
+		}
+		list_entry = (*list_entry).Flink;
+	}
 }
+
 
 /// Returns the [IMAGE_EXPORT_DIRECTORY] of loaded DLL and the `AddressOfFunctions`, `AddressOfNameOrdinals` and `AddressOfNames` arrays referenced inside
 ///
 /// Mostly just made to avoid having to reapeat this code in every function that need them
 unsafe fn parse_export_directory<'a>(
-    base_address: *const u8,
+	base_address: *const u8,
 ) -> Result<(IMAGE_EXPORT_DIRECTORY, &'a [u32], &'a [u16], &'a [u32]), DllParserError> {
-    // Get the offset to the NT headers from the PE header
-    let nt_offset = base_address.byte_offset(0x03c);
+	// Get the offset to the NT headers from the PE header
+	let nt_offset = base_address.byte_offset(0x03c);
 
-    // Get a reference to the NT headers and check the signature
-    let nt_header: &IMAGE_NT_HEADERS = &base_address
-        .byte_offset(*nt_offset as isize)
-        .cast::<IMAGE_NT_HEADERS>()
-        .read();
-    if nt_header.Signature != IMAGE_NT_SIGNATURE {
-        return Err(DllParserError::InvalidNtHeader);
-    }
+	// Get a reference to the NT headers and check the signature
+	let nt_header: &IMAGE_NT_HEADERS = &base_address
+		.byte_offset(*nt_offset as isize)
+		.cast::<IMAGE_NT_HEADERS>()
+		.read();
+	if nt_header.Signature != IMAGE_NT_SIGNATURE {
+		return Err(DllParserError::InvalidNtHeader);
+	}
 
-    // Get a reference to the export directory
-    let export_dir: IMAGE_EXPORT_DIRECTORY = base_address
-        .offset(nt_header.OptionalHeader.DataDirectory[0].VirtualAddress as isize)
-        .cast::<IMAGE_EXPORT_DIRECTORY>()
-        .read();
+	// Get a reference to the export directory
+	let export_dir: IMAGE_EXPORT_DIRECTORY = base_address
+		.offset(nt_header.OptionalHeader.DataDirectory[0].VirtualAddress as isize)
+		.cast::<IMAGE_EXPORT_DIRECTORY>()
+		.read();
 
-    let address_of_functions: &[u32] = slice::from_raw_parts(
-        base_address
-            .byte_offset(export_dir.AddressOfFunctions as isize)
-            .cast::<u32>(),
-        export_dir.NumberOfFunctions as usize,
-    );
-    let address_of_name_ordinals: &[u16] = slice::from_raw_parts(
-        base_address
-            .byte_offset(export_dir.AddressOfNameOrdinals as isize)
-            .cast::<u16>(),
-        export_dir.NumberOfNames as usize,
-    );
-    let address_of_names: &[u32] = slice::from_raw_parts(
-        base_address
-            .byte_offset(export_dir.AddressOfNames as isize)
-            .cast::<u32>(),
-        export_dir.NumberOfNames as usize,
-    );
+	let address_of_functions: &[u32] = slice::from_raw_parts(
+		base_address
+			.byte_offset(export_dir.AddressOfFunctions as isize)
+			.cast::<u32>(),
+		export_dir.NumberOfFunctions as usize,
+	);
+	let address_of_name_ordinals: &[u16] = slice::from_raw_parts(
+		base_address
+			.byte_offset(export_dir.AddressOfNameOrdinals as isize)
+			.cast::<u16>(),
+		export_dir.NumberOfNames as usize,
+	);
+	let address_of_names: &[u32] = slice::from_raw_parts(
+		base_address
+			.byte_offset(export_dir.AddressOfNames as isize)
+			.cast::<u32>(),
+		export_dir.NumberOfNames as usize,
+	);
 
-    Ok((
-        export_dir,
-        address_of_functions,
-        address_of_name_ordinals,
-        address_of_names,
-    ))
+	Ok((
+		export_dir,
+		address_of_functions,
+		address_of_name_ordinals,
+		address_of_names,
+	))
 }
+
 
 /// Finds the address of a function by its name in the export table of a loaded module.
 ///
@@ -219,33 +224,34 @@ unsafe fn parse_export_directory<'a>(
 /// }
 /// ```
 pub unsafe fn get_function_address(
-    function_name: &str,
-    base_address: *const u8,
+	function_name: &str,
+	base_address: *const u8,
 ) -> Result<*const u8, DllParserError> {
-    let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
-        parse_export_directory(base_address)?;
+	let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
+		parse_export_directory(base_address)?;
 
-    // We're searching by name, so we iterate over the list of names
-    for (i, name_addr) in address_of_names.iter().enumerate() {
-        // Then match over the result of CStr::from_ptr to capture eventual errors
-        match CStr::from_ptr((base_address as usize + *name_addr as usize) as *const i8).to_str() {
-            Ok(s) => {
-                // If it's ok, we test if our strings match
-                if s.eq_ignore_ascii_case(function_name) {
-                    // if it does, we return the address of the function
-                    let rva = address_of_functions[address_of_name_ordinals[i] as usize];
-                    let true_address = (base_address as usize + rva as usize) as *const u8;
-                    return Ok(true_address);
-                }
-            }
-            // If we captured an error, we forward it to the caller with our own error type
-            Err(e) => {
-                return Err(DllParserError::FunctionNameParsingError(e));
-            }
-        };
-    }
-    Err(DllParserError::FunctionNotFound)
+	// We're searching by name, so we iterate over the list of names
+	for (i, name_addr) in address_of_names.iter().enumerate() {
+		// Then match over the result of CStr::from_ptr to capture eventual errors
+		match CStr::from_ptr((base_address as usize + *name_addr as usize) as *const i8).to_str() {
+			Ok(s) => {
+				// If it's ok, we test if our strings match
+				if s.eq_ignore_ascii_case(function_name) {
+					// if it does, we return the address of the function
+					let rva = address_of_functions[address_of_name_ordinals[i] as usize];
+					let true_address = (base_address as usize + rva as usize) as *const u8;
+					return Ok(true_address);
+				}
+			}
+			// If we captured an error, we forward it to the caller with our own error type
+			Err(e) => {
+				return Err(DllParserError::FunctionNameParsingError(e));
+			}
+		};
+	}
+	Err(DllParserError::FunctionNotFound)
 }
+
 
 /// Retrieves a list of all exported functions from a loaded DLL.
 ///
@@ -275,30 +281,30 @@ pub unsafe fn get_function_address(
 /// let mut exported_functions: Vec<Export> = unsafe { get_all_exported_functions(module_address) }.unwrap();
 /// ```
 pub unsafe fn get_all_exported_functions(
-    base_address: *const u8,
+	base_address: *const u8,
 ) -> Result<Vec<Export>, DllParserError> {
-    let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
-        parse_export_directory(base_address)?;
-    let mut exported_functions = Vec::new();
-    // We iterate over the list of names
-    for (i, name_addr) in address_of_names.iter().enumerate() {
-        // Then match over the result of CStr::from_ptr to capture eventual errors
-        match CStr::from_ptr((base_address as usize + *name_addr as usize) as *const i8).to_str() {
-            Ok(function_name) => {
-                // Get the address of the function
-                let rva = address_of_functions[address_of_name_ordinals[i] as usize];
-                let true_address = (base_address as usize + rva as usize) as *const u8;
-                // Push the functions name and address to the return vector
-                exported_functions.push(Export {
-                    name: function_name.to_owned(),
-                    address: true_address,
-                    ordinal: address_of_name_ordinals[i],
-                });
-            }
-            Err(e) => {
-                return Err(DllParserError::FunctionNameParsingError(e));
-            }
-        };
-    }
-    Ok(exported_functions)
+	let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
+		parse_export_directory(base_address)?;
+	let mut exported_functions = Vec::new();
+	// We iterate over the list of names
+	for (i, name_addr) in address_of_names.iter().enumerate() {
+		// Then match over the result of CStr::from_ptr to capture eventual errors
+		match CStr::from_ptr((base_address as usize + *name_addr as usize) as *const i8).to_str() {
+			Ok(function_name) => {
+				// Get the address of the function
+				let rva = address_of_functions[address_of_name_ordinals[i] as usize];
+				let true_address = (base_address as usize + rva as usize) as *const u8;
+				// Push the functions name and address to the return vector
+				exported_functions.push(Export {
+					name: function_name.to_owned(),
+					address: true_address,
+					ordinal: address_of_name_ordinals[i],
+				});
+			}
+			Err(e) => {
+				return Err(DllParserError::FunctionNameParsingError(e));
+			}
+		};
+	}
+	Ok(exported_functions)
 }

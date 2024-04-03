@@ -9,30 +9,16 @@ It is written entirely in Rust and so far I tried as much as possible to make ev
 So far only a small part of this project is complete, but it is already capable to showcase basic malware development
 techniques, such as :
 
-* PEB Walking and enumeration using custom implementatiion of GetModuleHandle/GetProcAddress
+* PEB Walking and enumeration using custom implementation of GetModuleHandle/GetProcAddress
 * Direct syscalls with dynamic syscall ID retrieval using a mix of techniques such as Hell's Gates and Halo's Gate (see
   in [Examples](./examples/readme.md)).
 * Indirect syscalls, you can now pick between the two by including either one or the other macro, like so :
+  * `use thermite::indirect_syscall as syscall;` or `use thermite::direct_syscall as syscall;`
 
-```rust
-use thermite::indirect_syscall as syscall;
-//or 
-use thermite::direct_syscall as syscall;
-```
+The two being completely interchangeable, feel free to test both.
 
-## Usage
-
-You can easily add the project as dependency to your rust project using `cargo` :
-
-```
-cargo add --git https://github.com/Red4mber/Thermite
-```
-
-Then you can use the project in any way you like, i suggest taking a look at the [examples](./examples/readme.md) to see
-the various ways in which this can be useful to your project.
-
-Most of the functionnalities are abstracted behind a single easy to use syscall macro, which will automatically perform
-the required preparation such as resolving the syscall ID.
+I also began implementing various techniques such as process enumeration, etw/amsi patching, PPID spoofing etc... You'll
+find most of these in the example directory.
 
 ### Go check out the code :D
 

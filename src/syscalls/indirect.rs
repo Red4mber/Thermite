@@ -1,8 +1,7 @@
 use std::arch::global_asm;
 use std::ptr;
+
 use crate::peb_walk::{get_all_exported_functions, get_module_address};
-
-
 
 // https://stackoverflow.com/questions/49928950/acceptability-of-regular-usage-of-r10-and-r11
 // https://www.reddit.com/r/asm/comments/j4mofq/why_cant_you_clobber_certain_registers/
@@ -42,62 +41,42 @@ indirect_execute:
 );
 
 extern "C" {
-    /// Imported from the assembly code above
-    ///
-    /// Not really made to be called directly, it is better to use the [`thermite::syscall`] macro.
-    ///
-    /// ### Arguments :
-    ///  - `ssn` : 16-bit unsigned int, the System Service Number of the syscall you want to call
-    ///  - `arg_count`: 32-bit unsigned int, refers to the count of arguments to pass to syscall (excluding these two, which are not passed to syscall)
-    ///  - `syscall address`: the address of a syscall instruction where to jump
-    ///  - ...  -> Then, every argument to pass to the syscall instruction.
-    pub fn indirect_stub(ssn: u16, arg_count: u32, addr: *const u8, ...) -> i32;
+	/// Imported from the assembly code above
+	///
+	/// Not really made to be called directly, it is better to use the [`thermite::syscall`] macro.
+	///
+	/// ### Arguments :
+	///  - `ssn` : 16-bit unsigned int, the System Service Number of the syscall you want to call
+	///  - `arg_count`: 32-bit unsigned int, refers to the count of arguments to pass to syscall (excluding these two, which are not passed to syscall)
+	///  - `syscall address`: the address of a syscall instruction where to jump
+	///  - ...  -> Then, every argument to pass to the syscall instruction.
+	pub fn indirect_stub(ssn: u16, arg_count: u32, addr: *const u8, ...) -> i32;
 }
-
-
-//          4C 8B D1                 //  mov r10,rcx
-//          B8 ?? ?? 00 00           //  mov eax,1
-//          F6 04 25 08 03 FE 7F 01  //  test byte ptr ds:[7FFE0308],1
-//          75 03                    //  jne ntdll.7FFACE92F395
-//          0F 05                    //  syscall
-//     SSN @ +4  Bytes
-//    Test @ +8  Bytes
-//    Jump @ +16 Bytes
-// Syscall @ +18 Bytes
-pub unsafe fn find_syscall_address(addr: *const u8) -> Option<*const u8> {
-    let syscall_ptr = addr.byte_offset(18);
-    match unsafe { ptr::read(syscall_ptr as *const [u8; 2]) } {
-        [0x0f, 0x05] => { Some(syscall_ptr) },
-        _ => { None }
-    }
-}
-
 
 #[macro_export]
 macro_rules! indirect_syscall {
     ($name:literal $(, $args:expr)* $(,)?) => {
          unsafe {
-            $crate::syscalls::indirect::indirect_stub(
+            let _status: i32 = $crate::syscalls::indirect::indirect_stub(
                 $crate::syscalls::find_single_ssn($name).unwrap(),
                 thermite::count_args!($($args),*),
                 $crate::syscalls::indirect::find_single_syscall_addr(),
-                $($args),*
-            )
-        };
+                $($args),* );
+            mem::transmute::<i32, $crate::models::windows::nt_status::NtStatus>(_status)
+        }
     }
 }
 
-
-// TODO Refactor that disgusting mess
+// Return the address of the first syscall instruction found
 pub unsafe fn find_single_syscall_addr() -> *const u8 {
-    let iter = get_all_exported_functions(
-        get_module_address("ntdll.dll").unwrap()
-    ).expect("Function not found in the export table");
-    let aa = iter.iter().find(|x| {
-        let syscall_ptr = x.address.byte_offset(18);
-        ptr::read(syscall_ptr as *const [u8; 2]).eq(&[0x0f, 0x05])
-    }).unwrap();
-    aa.address.byte_offset(18)
+	get_all_exported_functions(get_module_address("ntdll.dll").unwrap()).unwrap()
+	                                                                    .iter().find(|x| {
+		let syscall_ptr = x.address.byte_offset(18);
+		ptr::read(syscall_ptr as *const [u8; 2]).eq(&[0x0f, 0x05])
+	}).unwrap().address.byte_offset(18)
 }
 
 
+// TODO : You can probably do this better ...
+// Maybe address randomisation ?
+// It's not like there's just a single syscall instruction in ntdll, be creative !

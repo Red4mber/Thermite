@@ -1,8 +1,10 @@
+#![allow(nonstandard_style)]
 // This place is not a place of honor...
 // no highly esteemed deed is commemorated here...
 // nothing valued is here.
 
 use std::ffi::c_void;
+
 use crate::models::windows::peb_teb::UNICODE_STRING;
 
 
@@ -16,6 +18,7 @@ pub mod pe_file_format;
 
 // A single enum with 3000 variants to match NT_STATUS to actual legible errors
 pub mod nt_status;
+pub mod system_info;
 
 // MASSIVE TODO: Clean up all these modules and remove everything unused
 // Todo two : Reformat / Refactor both modules to respect rusts naming convention and make it easier to read
@@ -38,12 +41,26 @@ pub const PROCESS_VM_READ: u32 = 0x0010;
 // Required to read memory in a process using ReadProcessMemory.
 pub const PROCESS_VM_WRITE: u32 = 0x0020;       // Required to write to memory in a process using WriteProcessMemory.
 
+
+// Some types that i just left around and i'm now too lazy to clean it up
+pub type HANDLE = *mut c_void;
+pub type PVOID = *mut c_void;
+
+
+// The magic handles o//
+pub const NtCurrentProcess: HANDLE = -1isize as *mut c_void;
+pub const NtCurrentThread: HANDLE = -2isize as *mut c_void;
+pub const NtCurrentSession: HANDLE = -3isize as *mut c_void;
+pub const NtCurrentProcessToken: HANDLE = -4isize as *mut c_void;
+pub const NtCurrentThreadToken: HANDLE = -5isize as *mut c_void;
+pub const NtCurrentEffectiveToken: HANDLE = -6isize as *mut c_void;
+
+
 #[repr(C)]
 pub struct ClientId {
 	pub unique_process: isize,
 	pub unique_thread: isize,
 }
-
 
 #[repr(C)]
 pub struct ObjectAttributes {
@@ -54,7 +71,6 @@ pub struct ObjectAttributes {
 	pub security_descriptor: *const c_void,
 	pub security_quality_of_service: *const c_void,
 }
-
 
 impl Default for ObjectAttributes {
 	fn default() -> ObjectAttributes {
