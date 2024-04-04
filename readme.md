@@ -1,32 +1,26 @@
 # Thermite: Offensive Rust
 
-This project aims to showcase various techniques for EDR/AV Evasion and malware development in rust.
+A malware development project written entirely in Rust.
 
-It is written entirely in Rust and so far I tried as much as possible to make everything myself.
+Despite the presentation as a library, only goal is to learn stuff, i don't really plan for it to be more than a collection of scripts and functions. 
 
 ## Summary
 
-So far only a small part of this project is complete, but it is already capable to showcase basic malware development
-techniques, such as :
+What is already done ?
 
 * PEB Walking and enumeration using custom implementation of GetModuleHandle/GetProcAddress
-* Direct syscalls with dynamic syscall ID retrieval using a mix of techniques such as Hell's Gates and Halo's Gate (see
-  in [Examples](./examples/readme.md)).
-* Indirect syscalls, you can now pick between the two by including either one or the other macro, like so :
-  * `use thermite::indirect_syscall as syscall;` or `use thermite::direct_syscall as syscall;`
+* Direct syscalls with dynamic syscall ID retrieval using a mix of techniques such as Hell's Gates and Halo's Gate/Tartarus gate.
+* Indirect syscalls (now with syscall sorting to retrieve SSNs o/)
 
-The two being completely interchangeable, feel free to test both.
-
-I also began implementing various techniques such as process enumeration, etw/amsi patching, PPID spoofing etc... You'll
-find most of these in the example directory.
+I am also currently working on various other techniques such as process enumeration, etw/amsi patching, PPID spoofing etc... Everything is not online yet, but i try to update the repository as regularly as possible.
 
 ### Go check out the code :D
 
-The goal of this project is to teach myself malware development, to that end, I took care to document everything and
-wrote detailed comments and documentation for this project. This is why i really invite anyone to go check out the code,
-I learned a lot while making this, maybe you could too, who knows ?
+The goal of this project is to teach myself malware development, this is why I took care to document everything and wrote detailed comments and documentation.
 
-After all, knowledge is meant to be shared <3
+For this reason i really invite anyone interested to go check out the code, I learned a lot while making this, maybe you could too, who knows ?
+
+Knowledge is meant to be shared <3
 
 ## Why the name ?
 
@@ -36,6 +30,6 @@ Also, it's cool and all cool projects need a cool name.
 
 ## License
 
-Nah, just take it
+Nah, take it
 
 Just don't be evil :)
