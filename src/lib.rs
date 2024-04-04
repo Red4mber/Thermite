@@ -5,8 +5,8 @@ extern crate self as thermite;
 pub mod error;
 pub mod models;
 pub mod peb_walk;
-
 pub mod syscalls;
+pub mod enumeration;
 
 
 //
