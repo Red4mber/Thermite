@@ -1,10 +1,9 @@
 // #![feature(half_open_range_patterns_in_slices)]
 use std::ptr;
 
-use thermite::{debug, error, info};
-use thermite::models::{Export, Syscall};
-use thermite::peb_walk::{get_all_exported_functions, get_function_address, get_module_address};
-use thermite::syscalls::search;
+use thermite::{debug, error};
+use thermite::peb_walk::{get_function_address, get_module_address};
+
 
 
 // To avoid requiring a hooked ntdll to test this method, i created this function to deny all addresses
@@ -17,17 +16,17 @@ unsafe fn deny_addresses(addr: *const u8) -> Option<*const u8> {
 		error!("{:#x?} is denied !", addr);
 		return None;
 	}
-	return Some(addr);
+	Some(addr)
 }
 
 
 // Check if we can find a SSN in this function
-pub fn find_ssn(addr: *const u8) -> Option<u16> {
-	unsafe { if deny_addresses(addr).is_none() { return None; } }       // For test purposes only
-	match unsafe { ptr::read(addr as *const [u8; 8]) } {
+unsafe fn find_ssn(addr: *const u8) -> Option<u16> {
+	deny_addresses(addr)?;      // For test purposes only
+	match ptr::read(addr as *const [u8; 8]) {
 		// Begins with JMP => Probably hooked
 		[0xe9, ..] => {
-			return unsafe { halos_gate(addr) };
+			return halos_gate(addr);
 		}
 		[0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00] => {
 			let ssn = ((ssn_2 as u16) << 8) + ssn_1 as u16;
@@ -45,13 +44,9 @@ pub fn find_ssn(addr: *const u8) -> Option<u16> {
 unsafe fn halos_gate(addr: *const u8) -> Option<u16> {
 	find_ssn(addr).or_else(|| {
 		for i in 1..500 {
-			let up = find_ssn(addr.byte_offset(32 * i)).and_then(|up| {
-				up.unwrap() - i as u16
-			});
+			let up = find_ssn(addr.byte_offset(32 * i)).map(|up| up - i as u16);
 			if up.is_some() { return up; }
-			let down = find_ssn(addr.byte_offset(-32 * i)).and_then(|down| {
-				down.unwrap() + i as u16
-			});
+			let down = find_ssn(addr.byte_offset(-32 * i)).map(|down| down + i as u16);
 			if down.is_some() { return down; }
 		}
 		None
@@ -62,7 +57,7 @@ unsafe fn halos_gate(addr: *const u8) -> Option<u16> {
 fn main() {
 	unsafe {
 		// Get the address of ntdll
-		let ntdll_address = unsafe { get_module_address("ntdll.dll") }.unwrap();
+		let ntdll_address = get_module_address("ntdll.dll").unwrap();
 
 		// Parse the export table to find our function
 		let addr = get_function_address("NtOpenProcess", ntdll_address).unwrap();
