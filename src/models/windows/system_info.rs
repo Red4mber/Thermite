@@ -76,7 +76,7 @@ pub struct ClientId {
 }
 
 #[repr(u32)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum SystemInformationClass {
     SystemBasicInformation = 0,
     SystemProcessorInformation = 1,
@@ -319,3 +319,4 @@ pub enum SystemInformationClass {
     SystemOriginalImageFeatureInformation = 238,
     MaxSystemInfoClass = 239,
 }
+

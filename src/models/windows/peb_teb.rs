@@ -355,7 +355,6 @@ pub struct TEB {
 	pub placeholder_reserved: [u8; 10],
 	pub proxied_process_id: u32,
 	pub _activation_stack: ActivationContextStack,
-	// 0x2d0
 	pub working_on_behalf_ticket: [u8; 8],
 	pub exception_code: i32,
 	pub padding0: [u8; 4],
@@ -402,7 +401,6 @@ pub struct TEB {
 	pub etw_trace_data: *const c_void,
 	pub win_sock_data: *const c_void,
 	pub gdi_batch_count: u32,
-	//0x1740 ok
 	pub current_ideal_processor: IdealProcessorUnion,
 	pub guaranteed_stack_bytes: u32,
 	pub padding5: [u8; 4],
@@ -445,16 +443,6 @@ pub struct TEB {
 	pub extended_feature_disable_mask: u64,
 }
 
-
-#[repr(C)]
-pub struct Guid {
-	pub data1: u32,
-	pub data2: u16,
-	pub data3: u16,
-	pub data4: [u8; 8],
-}
-
-
 #[repr(C)]
 pub struct TEBActiveFrame {
 	pub flags: u64,
@@ -471,7 +459,7 @@ pub struct TEBActiveFrameContext {
 
 
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct ProcessorNumber {
 	pub group: u16,
 	pub number: u8,
@@ -489,6 +477,16 @@ pub union IdealProcessorUnion {
 }
 
 
+impl fmt::Debug for IdealProcessorUnion {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		unsafe {
+			f.debug_set()
+			 .entry(&self.current_ideal_processor)
+			 .entry(&self.ideal_processor)
+			 .finish()
+		}
+	}
+}
 pub union TebFlagsUnion {
 	pub cross_teb_flags: u16,
 	// - SpareCrossTebBits : Pos 0, 16 Bits,
@@ -512,7 +510,20 @@ pub union TebFlagsUnion {
 }
 
 
+impl fmt::Debug for TebFlagsUnion {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		unsafe {
+			f.debug_set()
+			 .entry(&self.cross_teb_flags)
+			 .entry(&self.same_teb_flags)
+			 .finish()
+		}
+	}
+}
+
+
 #[repr(C)]
+#[derive(Debug)]
 pub struct ActivationContextStack {
 	pub active_frame: *const RtlActivationContextStackFrame,
 	pub frame_list_cache: ListEntry,
@@ -523,6 +534,7 @@ pub struct ActivationContextStack {
 
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct RtlActivationContextStackFrame {
 	pub previous: *const RtlActivationContextStackFrame,
 	pub context: *const ActivationContext,
@@ -531,6 +543,7 @@ pub struct RtlActivationContextStackFrame {
 
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct GdiTebBatch {
 	pub has_rendering_command: u32,
 	pub hdc: u64,
@@ -539,6 +552,7 @@ pub struct GdiTebBatch {
 
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct NtTib {
 	pub exception_list: *const ExceptionRegistrationRecord,
 	pub stack_base: *const c_void,
@@ -551,6 +565,7 @@ pub struct NtTib {
 
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct ExceptionRegistrationRecord {
 	pub next: *const ExceptionRegistrationRecord,
 	pub handler: *const ExceptionDisposition,
@@ -564,7 +579,19 @@ pub union FiberDataUnion {
 }
 
 
+impl fmt::Debug for FiberDataUnion {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		unsafe {
+			f.debug_set()
+			 .entry(&self.fiber_data)
+			 .entry(&self.version)
+			 .finish()
+		}
+	}
+}
+
 #[repr(u32)]
+#[derive(Debug)]
 pub enum ExceptionDisposition {
 	ExceptionContinueExecution = 0,
 	ExceptionContinueSearch = 1,
@@ -739,6 +766,21 @@ impl fmt::Debug for UnicodeString {
 	}
 }
 
+
+#[repr(C)]
+pub struct Guid {
+	pub data1: u32,
+	pub data2: u16,
+	pub data3: u16,
+	pub data4: [u8; 8],
+}
+
+
+impl fmt::Debug for Guid {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{:08X?}-{:04X?}-{:04X?}-{:02X?}{:02X?}-{:02X?}{:02X?}{:02X?}{:02X?}{:02X?}{:02X?}", self.data1, self.data2, self.data3, self.data4[0], self.data4[1], self.data4[2], self.data4[3], self.data4[4], self.data4[5], self.data4[6], self.data4[7])
+	}
+}
 
 // Why tf did i even bother make a large integer type when there's u64 and i64 ?!
 // Damn sometimes i really need to turn my brain on before coding

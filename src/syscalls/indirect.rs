@@ -62,7 +62,7 @@ macro_rules! indirect_syscall {
                 $crate::count_args!($($args),*),
                 $crate::syscalls::indirect::find_single_syscall_addr(),
                 $($args),* );
-            mem::transmute::<i32, $crate::models::windows::nt_status::NtStatus>(_status)
+            core::mem::transmute::<i32, $crate::models::windows::nt_status::NtStatus>(_status)
         }
     }
 }

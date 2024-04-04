@@ -56,12 +56,6 @@ pub const NT_CURRENT_EFFECTIVE_TOKEN: HANDLE = -6isize as *mut c_void;
 
 
 #[repr(C)]
-pub struct ClientId {
-	pub unique_process: isize,
-	pub unique_thread: isize,
-}
-
-#[repr(C)]
 pub struct ObjectAttributes {
 	pub length: u32,
 	pub root_directory: isize,
