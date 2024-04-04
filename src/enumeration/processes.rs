@@ -30,14 +30,13 @@ pub fn get_process_info() -> *const SystemProcessInformation {
         0u32,                       // [in]      PULONG    ZeroBits,
         &mut buf_size,              // [in, out] PSIZE_T   RegionSize,
         MEM_COMMIT | MEM_RESERVE,   // [in]      ULONG     AllocationType,
-        PAGE_EXECUTE_READWRITE);
-	// [in]      ULONG     Protect
+        PAGE_EXECUTE_READWRITE);    // [in]      ULONG     Protect
 	info!("Allocated {} bytes of memory at address {:#x?}", buf_size, buffer);
 
 	// We can now make a second call, this time with teh memory already allocated to store the result
 	let mut buf_size_2: isize = 0;
 	syscall!("NtQuerySystemInformation",
-	    info_class, // [in]            SystemInformationClass SystemInformationClass,
+	    info_class,                    // [in]            SystemInformationClass SystemInformationClass,
 	    buffer as *mut _,              // [in, out]       PVOID                    SystemInformation,
 	    buf_size,                      // [in]            ULONG                    SystemInformationLength,
 	    &mut buf_size_2);              // [out, optional] PULONG                   ReturnLength

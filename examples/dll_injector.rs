@@ -12,6 +12,7 @@ use thermite::indirect_syscall as syscall;
 use thermite::models::windows::*;
 use thermite::models::windows::nt_status::NtStatus;
 use thermite::models::windows::peb_teb::UnicodeString;
+use thermite::models::windows::system_info::ClientId;
 use thermite::peb_walk::{get_function_address, get_module_address};
 
 
