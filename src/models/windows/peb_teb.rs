@@ -1,5 +1,6 @@
 use std::ffi::c_void;
 use std::fmt;
+use crate::models::windows::system_info::ClientId;
 
 
 /// More than 500 lines of uselessness
@@ -319,6 +320,260 @@ pub struct LdrpCslist {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct LdrpLoadContext {}
+
+
+//=====================================================
+//
+//      Thread Environment Block
+//
+// > Fully loaded
+// No missing field, including undocumented ones
+// All sizes and offsets verified (and corrected)
+//=====================================================
+#[repr(C)]
+#[derive(Debug)]
+pub struct TEB {
+	pub nt_tib: NtTib,
+	pub environment_pointer: *const c_void,
+	pub client_id: ClientId,
+	pub active_rpc_handle: *const c_void,
+	pub thread_local_storage_pointer: *const c_void,
+	pub process_environment_block: *const PEB,
+	pub last_error_value: u32,
+	pub count_of_owned_critical_sections: u32,
+	pub csr_client_thread: *const c_void,
+	pub win32thread_info: *const c_void,
+	pub user32reserved: [u32; 26],
+	pub user_reserved: [u32; 5],
+	pub wow32reserved: *const c_void,
+	pub current_locale: u32,
+	pub fp_software_status_register: u32,
+	pub reserved_for_debugger_instrumentation: [*const c_void; 16],
+	pub system_reserved1: [*const c_void; 30],
+	pub placeholder_compatibility_mode: u8,
+	pub placeholder_hydration_always_explicit: u8,
+	pub placeholder_reserved: [u8; 10],
+	pub proxied_process_id: u32,
+	pub _activation_stack: ActivationContextStack,
+	// 0x2d0
+	pub working_on_behalf_ticket: [u8; 8],
+	pub exception_code: i32,
+	pub padding0: [u8; 4],
+	pub activation_context_stack_pointer: *const ActivationContextStack,
+	pub instrumentation_callback_sp: u64,
+	pub instrumentation_callback_previous_pc: u64,
+	pub instrumentation_callback_previous_sp: u64,
+	pub tx_fs_context: u32,
+	pub instrumentation_callback_disabled: u8,
+	pub unaligned_load_store_exceptions: u8,
+	pub padding1: [u8; 2],
+	pub gdi_teb_batch: GdiTebBatch,
+	pub real_client_id: ClientId,
+	pub gdi_cached_process_handle: *const c_void,
+	pub gdi_client_pid: u32,
+	pub gdi_client_tid: u32,
+	pub gdi_thread_local_info: *const c_void,
+	pub win32client_info: [u64; 62],
+	pub gl_dispatch_table: [*const c_void; 233],
+	pub gl_reserved1: [u64; 29],
+	pub gl_reserved2: *const c_void,
+	pub gl_section_info: *const c_void,
+	pub gl_section: *const c_void,
+	pub gl_table: *const c_void,
+	pub gl_current_rc: *const c_void,
+	pub gl_context: *const c_void,
+	pub last_status_value: u32,
+	pub padding2: [u8; 4],
+	pub static_unicode_string: UnicodeString,
+	pub static_unicode_buffer: [u16; 261],
+	pub padding3: [u8; 6],
+	pub deallocation_stack: *const c_void,
+	pub tls_slots: [*const c_void; 64],
+	pub tls_links: ListEntry,
+	pub vdm: *const c_void,
+	pub reserved_for_nt_rpc: *const c_void,
+	pub dbg_ss_reserved: [*const c_void; 2],
+	pub hard_error_mode: u32,
+	pub padding4: [u8; 4],
+	pub instrumentation: [*const c_void; 11],
+	pub activity_id: Guid,
+	pub sub_process_tag: *const c_void,
+	pub perflib_data: *const c_void,
+	pub etw_trace_data: *const c_void,
+	pub win_sock_data: *const c_void,
+	pub gdi_batch_count: u32,
+	//0x1740 ok
+	pub current_ideal_processor: IdealProcessorUnion,
+	pub guaranteed_stack_bytes: u32,
+	pub padding5: [u8; 4],
+	pub reserved_for_perf: *const c_void,
+	pub reserved_for_ole: *const c_void,
+	pub waiting_on_loader_lock: u32,
+	pub padding6: [u8; 4],
+	pub saved_priority_state: *const c_void,
+	pub reserved_for_code_coverage: u64,
+	pub thread_pool_data: *const c_void,
+	pub tls_expansion_slots: *const *const c_void,
+	pub chpe_v2cpu_area_info: *const Chpev2CpuareaInfo,
+	pub unused: *const c_void,
+	pub mui_generation: u32,
+	pub is_impersonating: u32,
+	pub nls_cache: *const c_void,
+	pub p_shim_data: *const c_void,
+	pub heap_data: u32,
+	pub padding7: [u8; 4],
+	pub current_transaction_handle: *const c_void,
+	pub active_frame: *const TEBActiveFrame,
+	pub fls_data: *const c_void,
+	pub preferred_languages: *const c_void,
+	pub user_pref_languages: *const c_void,
+	pub merged_pref_languages: *const c_void,
+	pub mui_impersonation: u32,
+	pub teb_flags: TebFlagsUnion,
+	pub txn_scope_enter_callback: *const c_void,
+	pub txn_scope_exit_callback: *const c_void,
+	pub txn_scope_context: *const c_void,
+	pub lock_count: u32,
+	pub wow_teb_offset: i32,
+	pub resource_ret_value: *const c_void,
+	pub reserved_for_wdf: *const c_void,
+	pub reserved_for_crt: u64,
+	pub effective_container_id: Guid,
+	pub last_sleep_counter: u64,
+	pub spin_call_count: u32,
+	pub padding8: [u8; 4],
+	pub extended_feature_disable_mask: u64,
+}
+
+
+#[repr(C)]
+pub struct Guid {
+	pub data1: u32,
+	pub data2: u16,
+	pub data3: u16,
+	pub data4: [u8; 8],
+}
+
+
+#[repr(C)]
+pub struct TEBActiveFrame {
+	pub flags: u64,
+	pub previous: *const TEBActiveFrame,
+	pub context: *const TEBActiveFrameContext,
+}
+
+
+#[repr(C)]
+pub struct TEBActiveFrameContext {
+	pub flags: u64,
+	pub frame_name: *const u8,
+}
+
+
+#[repr(C)]
+#[derive(Copy, Clone)]
+pub struct ProcessorNumber {
+	pub group: u16,
+	pub number: u8,
+	pub reserved: u8,
+}
+
+
+#[repr(C)]
+pub union IdealProcessorUnion {
+	pub current_ideal_processor: ProcessorNumber,
+	pub reserved_pad_0: u8,
+	pub reserved_pad_1: u8,
+	pub reserved_pad_2: u8,
+	pub ideal_processor: u8,
+}
+
+
+pub union TebFlagsUnion {
+	pub cross_teb_flags: u16,
+	// - SpareCrossTebBits : Pos 0, 16 Bits,
+	pub same_teb_flags: u16,
+	// - SafeThunkCall    : Pos 0, 1 Bit,
+	// - InDebugPrint     : Pos 1, 1 Bit,
+	// - HasFiberData     : Pos 2, 1 Bit,
+	// - SkipThreadAttach : Pos 3, 1 Bit,
+	// - WerInShipAssertCode : Pos 4, 1 Bit,
+	// - RanProcessInit   : Pos 5, 1 Bit,
+	// - ClonedThread     : Pos 6, 1 Bit,
+	// - SuppressDebugMsg : Pos 7, 1 Bit,
+	// - DisableUserStackWalk : Pos 8, 1 Bit,
+	// - RtlExceptionAttached : Pos 9, 1 Bit,
+	// - InitialThread    : Pos 10, 1 Bit,
+	// - SessionAware     : Pos 11, 1 Bit,
+	// - LoadOwner        : Pos 12, 1 Bit,
+	// - LoaderWorker     : Pos 13, 1 Bit,
+	// - SkipLoaderInit   : Pos 14, 1 Bit,
+	// - SkipFileAPIBrokering : Pos 15, 1 Bit,
+}
+
+
+#[repr(C)]
+pub struct ActivationContextStack {
+	pub active_frame: *const RtlActivationContextStackFrame,
+	pub frame_list_cache: ListEntry,
+	pub flags: u32,
+	pub next_cookie_sequence_number: u32,
+	pub stack_id: u32,
+}
+
+
+#[repr(C)]
+pub struct RtlActivationContextStackFrame {
+	pub previous: *const RtlActivationContextStackFrame,
+	pub context: *const ActivationContext,
+	pub flags: u64,
+}
+
+
+#[repr(C)]
+pub struct GdiTebBatch {
+	pub has_rendering_command: u32,
+	pub hdc: u64,
+	pub buffer: [u32; 310],
+}
+
+
+#[repr(C)]
+pub struct NtTib {
+	pub exception_list: *const ExceptionRegistrationRecord,
+	pub stack_base: *const c_void,
+	pub stack_limit: *const c_void,
+	pub sub_system_tib: *const c_void,
+	pub fiber_data: FiberDataUnion,
+	pub arbitrary_user_pointer: *const c_void,
+	pub self_ptr: *const NtTib,
+}
+
+
+#[repr(C)]
+pub struct ExceptionRegistrationRecord {
+	pub next: *const ExceptionRegistrationRecord,
+	pub handler: *const ExceptionDisposition,
+}
+
+
+#[repr(C)]
+pub union FiberDataUnion {
+	pub fiber_data: *const c_void,
+	pub version: u32,
+}
+
+
+#[repr(u32)]
+pub enum ExceptionDisposition {
+	ExceptionContinueExecution = 0,
+	ExceptionContinueSearch = 1,
+	ExceptionNestedException = 2,
+	ExceptionCollidedUnwind = 3,
+}
+
+
+pub struct Chpev2CpuareaInfo;
 
 //============================================================================
 //
