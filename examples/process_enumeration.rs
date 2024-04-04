@@ -1,12 +1,9 @@
 #[allow(unused)]
 use core::mem;
-use std::arch::asm;
-use thermite::enumeration::*;
 
-use thermite::{debug, info};
-use thermite::enumeration::processes::{enumerate_processes, find_process_by_name};
-use thermite::models::windows::peb_teb::PEB;
-use thermite::models::windows::system_info::{ClientId, SystemProcessInformation};
+use thermite::enumeration::*;
+use thermite::info;
+use thermite::models::windows::system_info::SystemProcessInformation;
 
 
 /// Small stucture to represent a process
@@ -33,41 +30,41 @@ pub struct Thread {
 
 
 fn main() {
-	unsafe {
-		let sys_proc_info_ptr = processes::get_process_info_ptr();
-		let process_name = "Notepad.exe";
-		match find_process_by_name(process_name, sys_proc_info_ptr) {
-			None => info!("Process {} not found", process_name),
-			Some(process) => {
-				info!("{} Info :\n\t{:?}", process_name, read_process_info(process));
-			},
-		};
-
-		let processes = enumerate_processes(sys_proc_info_ptr);
-		for process in processes {
-			info!("- {}\n\t> PID: {}", process.0, process.1)
-		}
-
-		println!("Command line: {}", get_command_line());
-		println!("Current directory: {}", get_current_directory());
-		let var = "username";
-		match get_environment_var(var) {
-			Some(env) => println!("[^-^] {var} = {env}"),
-			None => eprintln!("[x_X] Environment variable {var} not found"),
-		};
-
-		// get_environment().iter().for_each(|env| {
-		// 	let mut s = env.clone();
-		// 	s.truncate(100);
-		// 	println!("\t{:?}", s)
-		// });
-
-		debug!(get_computer_name());
-		debug!(get_username());
-		debug!(get_temp());
-		debug!(get_appdata());
-		debug!(get_windir());
+	// Retrieve system process info
+	let sys_proc_info_ptr = processes::get_process_info();
+	
+	// Searching for a specific process
+	let process_name = "Notepad.exe";
+	match unsafe { processes::find_process_by_name(process_name, sys_proc_info_ptr) } {
+		None => info!("Process {} not found", process_name),
+		Some(process) => {
+			info!("{} Info :\n{:#?}", process_name, unsafe { read_process_info(process) });
+		},
 	};
+
+	// Enumerate all processes
+	let processes = unsafe { processes::enumerate_processes(sys_proc_info_ptr) };
+	for process in processes {
+		println!("\t<{}> {}", process.1, process.0)
+	}
+
+	// Other utility enumeration functions
+	unsafe {
+		info!("Command line: {}", get_command_line());
+		info!("Current directory: {}", get_current_directory());
+	}
+	// List all environment variables
+	let var = "username";
+	match get_environment_var(var) {
+		Some(env) => println!("[^-^] {var} = {env}"),
+		None => eprintln!("[x_X] Environment variable {var} not found"),
+	};
+	// Various functions to read environment variables 
+	info!(get_computer_name());
+	info!(get_username());
+	info!(get_temp());
+	info!(get_appdata());
+	info!(get_windir());
 }
 
 

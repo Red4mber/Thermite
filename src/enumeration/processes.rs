@@ -1,8 +1,8 @@
-use crate::info;
-use crate::models::windows::system_info::SystemProcessInformation;
-use crate::models::windows::system_info::SystemInformationClass;
 use crate::indirect_syscall as syscall;
-use crate::models::windows::{NT_CURRENT_PROCESS, PAGE_EXECUTE_READWRITE, MEM_RESERVE, MEM_COMMIT};
+use crate::info;
+use crate::models::windows::{MEM_COMMIT, MEM_RESERVE, NT_CURRENT_PROCESS, PAGE_EXECUTE_READWRITE};
+use crate::models::windows::system_info::SystemInformationClass;
+use crate::models::windows::system_info::SystemProcessInformation;
 
 
 /// This function returns a pointer to the system process information table.
@@ -11,7 +11,7 @@ use crate::models::windows::{NT_CURRENT_PROCESS, PAGE_EXECUTE_READWRITE, MEM_RES
 ///
 /// # Returns  
 /// A raw pointer to the [SystemProcessInformation] table.
-pub fn get_process_info_ptr() -> *const SystemProcessInformation {
+pub fn get_process_info() -> *const SystemProcessInformation {
 	let mut buffer: *mut std::ffi::c_void = 0u32 as _;
 	let mut buf_size: isize = 0;
 
