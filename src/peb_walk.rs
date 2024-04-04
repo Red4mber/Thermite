@@ -1,7 +1,9 @@
 //!
-//! Module containing all functions related to PEB Walking and DLL parsing
+//! Module containing all functions related to PEB Walking and DLL parsing :
 //!
-//!
+/// Functions in this module:
+/// [get_peb_address], [get_module_address], [list_all_loaded_modules], [parse_export_directory],
+/// [get_all_exported_functions], [get_function_address]
 
 use std::arch::asm;
 use std::ffi::CStr;
@@ -13,8 +15,23 @@ use crate::models::Module;
 use crate::models::windows::pe_file_format::{
 	ImageExportDirectory, ImageNtHeaders, IMAGE_NT_SIGNATURE,
 };
-use crate::models::windows::peb_teb::{LdrDataTableEntry, PEB};
+use crate::models::windows::peb_teb::{LdrDataTableEntry, PEB, TEB};
 
+
+pub fn get_teb_address() -> *const TEB {
+	#[cfg(target_arch = "x86")]
+	unsafe {
+		let teb: *const TEB;
+		asm!("mov eax, fs:[0x30]", out("eax") teb, options(nomem, nostack, preserves_flags));
+		teb
+	}
+	#[cfg(target_arch = "x86_64")]
+	unsafe {
+		let teb: *const TEB;
+		asm!("mov rax, gs:[0x30]", out("rax") teb, options(nomem, nostack, preserves_flags));
+		teb
+	}
+}
 
 /// This function uses inline assembly to retrieve the PEB address from the appropriate
 /// Thread environment Block (TEB) field based on the target architecture .
@@ -30,23 +47,23 @@ use crate::models::windows::peb_teb::{LdrDataTableEntry, PEB};
 /// Only supports x86 or x86_64
 ///
 pub fn get_peb_address() -> *const PEB {
-	#[inline(always)]
-	fn read_peb_ptr() -> *const PEB {
-		#[cfg(target_arch = "x86")]
-		unsafe {
-			let peb: *const PEB;
-			asm!("mov eax, fs:[0x30]", out("eax") peb, options(nomem, nostack, preserves_flags));
-			peb
-		}
-		#[cfg(target_arch = "x86_64")]
-		unsafe {
-			let peb: *const PEB;
-			asm!("mov rax, gs:[0x60]", out("rax") peb, options(nomem, nostack, preserves_flags));
-			peb
-		}
+	#[cfg(target_arch = "x86")]
+	unsafe {
+		let peb: *const PEB;
+		asm!("mov eax, fs:[0x30]", out("eax") peb, options(nomem, nostack, preserves_flags));
+		peb
 	}
-	read_peb_ptr()
+	#[cfg(target_arch = "x86_64")]
+	unsafe {
+		let peb: *const PEB;
+		asm!("mov rax, gs:[0x60]", out("rax") peb, options(nomem, nostack, preserves_flags));
+		peb
+	}
 }
+
+
+
+
 
 
 /// Returns the address of a loaded DLL
