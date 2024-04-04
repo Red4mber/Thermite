@@ -1,10 +1,8 @@
-// #![allow(nonstandard_style)]
-
 use std::ffi::c_void;
 
 use thermite::models::windows::HANDLE;
 
-use super::peb_teb::UNICODE_STRING;
+use super::peb_teb::UnicodeString;
 
 // Microsoft don't want us messing around with this stuff, so of course i looked into it
 // Added a few undocumented fields to these structs
@@ -16,70 +14,70 @@ use super::peb_teb::UNICODE_STRING;
 
 #[repr(C)]
 #[derive(Debug)]
-pub struct SYSTEM_PROCESS_INFORMATION {
-    pub NextEntryOffset: u32,
-    pub NumberOfThreads: u32,
-    pub WorkingSetPrivateSize: i64,
-    pub HardFaultCount: u32,
-    pub NumberOfThreadsHighWatermark: u32,
-    pub CycleTime: u64,
-    pub CreateTime: u64,
-    pub UserTime: i64,
-    pub KernelTime: i64,
-    pub ImageName: UNICODE_STRING,
-    pub BasePriority: i32,
-    pub UniqueProcessId: HANDLE,
-    pub InheritedFromUniqueProcessId: HANDLE,
-    pub HandleCount: u32,
-    pub SessionId: u32,
-    pub UniqueProcessKey: *const u32,
-    pub PeakVirtualSize: usize,
-    pub VirtualSize: usize,
-    pub PageFaultCount: u32,
-    pub PeakWorkingSetSize: usize,
-    pub WorkingSetSize: usize,
-    pub QuotaPeakPagedPoolUsage: usize,
-    pub QuotaPagedPoolUsage: usize,
-    pub QuotaPeakNonPagedPoolUsage: usize,
-    pub QuotaNonPagedPoolUsage: usize,
-    pub PagefileUsage: usize,
-    pub PeakPagefileUsage: usize,
-    pub PrivatePageCount: usize,
-    pub ReadOperationCount: i64,
-    pub WriteOperationCount: i64,
-    pub OtherOperationCount: i64,
-    pub ReadTransferCount: i64,
-    pub WriteTransferCount: i64,
-    pub OtherTransferCount: i64,
-    pub Threads: [SYSTEM_THREAD_INFORMATION; 1],
+pub struct SystemProcessInformation {
+    pub next_entry_offset: u32,
+    pub number_of_threads: u32,
+    pub working_set_private_size: i64,
+    pub hard_fault_count: u32,
+    pub number_of_threads_high_watermark: u32,
+    pub cycle_time: u64,
+    pub create_time: u64,
+    pub user_time: i64,
+    pub kernel_time: i64,
+    pub image_name: UnicodeString,
+    pub base_priority: i32,
+    pub unique_process_id: HANDLE,
+    pub inherited_from_unique_process_id: HANDLE,
+    pub handle_count: u32,
+    pub session_id: u32,
+    pub unique_process_key: *const u32,
+    pub peak_virtual_size: usize,
+    pub virtual_size: usize,
+    pub page_fault_count: u32,
+    pub peak_working_set_size: usize,
+    pub working_set_size: usize,
+    pub quota_peak_paged_pool_usage: usize,
+    pub quota_paged_pool_usage: usize,
+    pub quota_peak_non_paged_pool_usage: usize,
+    pub quota_non_paged_pool_usage: usize,
+    pub pagefile_usage: usize,
+    pub peak_pagefile_usage: usize,
+    pub private_page_count: usize,
+    pub read_operation_count: i64,
+    pub write_operation_count: i64,
+    pub other_operation_count: i64,
+    pub read_transfer_count: i64,
+    pub write_transfer_count: i64,
+    pub other_transfer_count: i64,
+    pub threads: [SystemThreadInformation; 1],
 }
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct SYSTEM_THREAD_INFORMATION {
-    pub KernelTime: u64,
-    pub UserTime: u64,
-    pub CreateTime: u64,
-    pub WaitTime: u32,
-    pub StartAddress: *mut c_void,
-    pub ClientId: CLIENT_ID,
-    pub Priority: i32,
-    pub BasePriority: i32,
-    pub ContextSwitches: u32,
-    pub ThreadState: u32,
-    pub WaitReason: u32,
+pub struct SystemThreadInformation {
+    pub kernel_time: u64,
+    pub user_time: u64,
+    pub create_time: u64,
+    pub wait_time: u32,
+    pub start_address: *mut c_void,
+    pub client_id: ClientId,
+    pub priority: i32,
+    pub base_priority: i32,
+    pub context_switches: u32,
+    pub thread_state: u32,
+    pub wait_reason: u32,
 }
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct CLIENT_ID {
-    pub UniqueProcess: HANDLE,
-    pub UniqueThread: HANDLE,
+pub struct ClientId {
+    pub unique_process: HANDLE,
+    pub unique_thread: HANDLE,
 }
 
 #[repr(u32)]
 #[derive(Clone, Copy)]
-pub enum SYSTEM_INFORMATION_CLASS {
+pub enum SystemInformationClass {
     SystemBasicInformation = 0,
     SystemProcessorInformation = 1,
     SystemPerformanceInformation = 2,

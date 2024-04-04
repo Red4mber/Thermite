@@ -1,11 +1,11 @@
-#![allow(nonstandard_style)]
+// #![allow(nonstandard_style)]
 // This place is not a place of honor...
 // no highly esteemed deed is commemorated here...
 // nothing valued is here.
 
 use std::ffi::c_void;
 
-use crate::models::windows::peb_teb::UNICODE_STRING;
+use crate::models::windows::peb_teb::UnicodeString;
 
 /// Stuff to deal with the PEB and TEB structures in windows
 /// Rather incomplete but also the less used of the two
@@ -47,12 +47,12 @@ pub type PVOID = *mut c_void;
 
 
 // The magic handles o//
-pub const NtCurrentProcess: HANDLE = -1isize as *mut c_void;
-pub const NtCurrentThread: HANDLE = -2isize as *mut c_void;
-pub const NtCurrentSession: HANDLE = -3isize as *mut c_void;
-pub const NtCurrentProcessToken: HANDLE = -4isize as *mut c_void;
-pub const NtCurrentThreadToken: HANDLE = -5isize as *mut c_void;
-pub const NtCurrentEffectiveToken: HANDLE = -6isize as *mut c_void;
+pub const NT_CURRENT_PROCESS: HANDLE = -1isize as *mut c_void;
+pub const NT_CURRENT_THREAD: HANDLE = -2isize as *mut c_void;
+pub const NT_CURRENT_SESSION: HANDLE = -3isize as *mut c_void;
+pub const NT_CURRENT_PROCESS_TOKEN: HANDLE = -4isize as *mut c_void;
+pub const NT_CURRENT_THREAD_TOKEN: HANDLE = -5isize as *mut c_void;
+pub const NT_CURRENT_EFFECTIVE_TOKEN: HANDLE = -6isize as *mut c_void;
 
 
 #[repr(C)]
@@ -65,7 +65,7 @@ pub struct ClientId {
 pub struct ObjectAttributes {
 	pub length: u32,
 	pub root_directory: isize,
-	pub object_name: *const UNICODE_STRING,
+	pub object_name: *const UnicodeString,
 	pub attributes: u32,
 	pub security_descriptor: *const c_void,
 	pub security_quality_of_service: *const c_void,

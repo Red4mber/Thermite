@@ -1,6 +1,3 @@
-#![allow(nonstandard_style)]
-// #![allow(unused)]
-
 use std::ffi::c_void;
 use std::fmt;
 
@@ -12,12 +9,12 @@ use std::fmt;
 
 //------------------------------------------------------------------
 //
-//              Process Environment Block
+//              Process environment Block
 //
 //------------------------------------------------------------------
 ///
 /// Structure containing all User-Mode parameters associated by system with current process.
-/// The Process Environment Block (PEB) is a process’s user-mode representation.
+/// The Process environment Block (PEB) is a process’s user-mode representation.
 ///
 /// It has the highest-level knowledge of a process in kernel mode and the lowest-level in user mode.
 /// The PEB is created by the kernel but is mostly operated on from user mode.
@@ -25,206 +22,191 @@ use std::fmt;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct PEB {
-	pub InheritedAddressSpace: u8,
-	pub ReadImageFileExecOptions: u8,
-	pub BeingDebugged: u8,
-	pub BitField: u8,
-	pub Padding0: [u8; 4],
-	pub Mutant: *const c_void,
-	pub ImageBaseAddress: *const c_void,
-	pub Ldr: *const PEB_LDR_DATA,
-	pub ProcessParameters: *const RTL_USER_PROCESS_PARAMETERS,
-	pub SubSystemData: *const c_void,
-	pub ProcessHeap: *const c_void,
-	pub FastPebLock: *const c_void,
-	// _RTL_CRITICAL_SECTION NYI
-	pub AtlThunkSListPtr: *const c_void,
-	// _SLIST_HEADER NYI
-	pub IFEOKey: *const c_void,
-	pub CrossProcessFlags: u32,
-	// Bitfield here
-	pub Padding1: [u8; 4],
-	pub _KernelCallbackTable: *const c_void,
-	// I may have missed a union, but screw that
-	pub SystemReserved: u32,
-	pub AtlThunkSListPtr32: u32,
-	pub ApiSetMap: *const c_void,
-	pub TlsExpansionCounter: u32,
-	pub Padding2: [u8; 4],
-	pub TlsBitmap: *const c_void,
-	// _RTL_BITMAP NYI
-	pub TlsBitmapBits: [u32; 2],
-	pub ReadOnlySharedMemoryBase: *const c_void,
-	pub SharedData: *const c_void,
-	pub ReadOnlyStaticServerData: *const *const c_void,
-	pub AnsiCodePageData: *const c_void,
-	pub OemCodePageData: *const c_void,
-	pub UnicodeCaseTableData: *const c_void,
-	pub NumberOfProcessors: u32,
-	pub NtGlobalFlag: u32,
-	pub CriticalSectionTimeout: i64,
-	pub HeapSegmentReserve: u64,
-	pub HeapSegmentCommit: u64,
-	pub HeapDeCommitTotalFreeThreshold: u64,
-	pub HeapDeCommitFreeBlockThreshold: u64,
-	pub NumberOfHeaps: u32,
-	pub MaximumNumberOfHeaps: u32,
-	pub ProcessHeaps: *const *const c_void,
-	pub GdiSharedHandleTable: *const c_void,
-	pub ProcessStarterHelper: *const c_void,
-	pub GdiDCAttributeList: u32,
-	pub Padding3: [u8; 4],
-	pub LoaderLock: *const c_void,
-	// _RTL_CRITICAL_SECTION NYI
-	pub OSMajorVersion: u32,
-	pub OSMinorVersion: u32,
-	pub OSBuildNumber: u16,
-	pub OSCSDVersion: u16,
-	pub OSPlatformId: u32,
-	pub ImageSubsystem: u32,
-	pub ImageSubsystemMajorVersion: u32,
-	pub ImageSubsystemMinorVersion: u32,
-	pub Padding4: [u8; 4],
-	pub ActiveProcessAffinityMask: u64,
-	pub GdiHandleBuffer: [u32; 60],
-	pub PostProcessInitRoutine: extern "system" fn(),
-	pub TlsExpansionBitmap: *const c_void,
-	// _RTL_BITMAP NYI
-	pub TlsExpansionBitmapBits: [u32; 32],
-	pub SessionId: u32,
-	pub Padding5: [u8; 4],
-	pub AppCompatFlags: u64,
-	pub AppCompatFlagsUser: u64,
-	pub pShimData: *const c_void,
-	pub AppCompatInfo: *const c_void,
-	pub CSDVersion: UNICODE_STRING,
-	pub ActivationContextData: *const c_void,
-	// _ACTIVATION_CONTEXT_DATA NYI
-	pub ProcessAssemblyStorageMap: *const c_void,
-	// _ASSEMBLY_STORAGE_MAP NYI
-	pub SystemDefaultActivationContextData: *const c_void,
-	// _ACTIVATION_CONTEXT_DATA NYI
-	pub SystemAssemblyStorageMap: *const c_void,
-	// _ASSEMBLY_STORAGE_MAP NYI
-	pub MinimumStackCommit: u64,
-	pub SparePointers: [*const c_void; 2],
-	pub PatchLoaderData: *const c_void,
-	pub ChpeV2ProcessInfo: *const c_void,
-	// _CHPEV2_PROCESS_INFO NYI
-	pub AppModelFeatureState: u32,
-	pub SpareUlongs: [u32; 2],
-	pub ActiveCodePage: u16,
-	pub OemCodePage: u16,
-	pub UseCaseMapping: u16,
-	pub UnusedNlsField: u16,
-	pub WerRegistrationData: *const c_void,
-	pub WerShipAssertPtr: *const c_void,
-	pub EcCodeBitMap: *const c_void,
-	pub pImageHeaderHash: *const c_void,
-	pub TracingFlags: u32,
-	pub Padding6: [u8; 4],
-	pub CsrServerReadOnlySharedMemoryBase: u64,
-	pub TppWorkerpListLock: u64,
-	pub TppWorkerpList: LIST_ENTRY,
-	pub WaitOnAddressHashTable: [*const c_void; 128],
-	pub TelemetryCoverageHeader: *const c_void,
-	pub CloudFileFlags: u32,
-	pub CloudFileDiagFlags: u32,
-	pub PlaceholderCompatibilityMode: u8,
-	pub PlaceholderCompatibilityModeReserved: [u8; 7],
-	pub LeapSecondData: *const c_void,
-	// _LEAP_SECOND_DATA NYI
-	pub LeapSecondFlags: u32,
-	pub NtGlobalFlag2: u32,
-	pub ExtendedFeatureDisableMask: u64,
+	pub inherited_address_space: u8,
+	pub read_image_file_exec_options: u8,
+	pub being_debugged: u8,
+	pub bit_field: u8,
+	pub padding0: [u8; 4],
+	pub mutant: *const c_void,
+	pub image_base_address: *const c_void,
+	pub ldr: *const PebLdrData,
+	pub process_parameters: *const RtlUserProcessParameters,
+	pub sub_system_data: *const c_void,
+	pub process_heap: *const c_void,
+	pub fast_peb_lock: *const c_void,
+	pub atl_thunk_slist_ptr: *const c_void,
+	pub ifeokey: *const c_void,
+	pub cross_process_flags: u32,
+	pub padding1: [u8; 4],
+	pub _kernel_callback_table: *const c_void,
+	pub system_reserved: u32,
+	pub atl_thunk_slist_ptr32: u32,
+	pub api_set_map: *const c_void,
+	pub tls_expansion_counter: u32,
+	pub padding2: [u8; 4],
+	pub tls_bitmap: *const c_void,
+	pub tls_bitmap_bits: [u32; 2],
+	pub read_only_shared_memory_base: *const c_void,
+	pub shared_data: *const c_void,
+	pub read_only_static_server_data: *const *const c_void,
+	pub ansi_code_page_data: *const c_void,
+	pub oem_code_page_data: *const c_void,
+	pub unicode_case_table_data: *const c_void,
+	pub number_of_processors: u32,
+	pub nt_global_flag: u32,
+	pub critical_section_timeout: i64,
+	pub heap_segment_reserve: u64,
+	pub heap_segment_commit: u64,
+	pub heap_de_commit_total_free_threshold: u64,
+	pub heap_de_commit_free_block_threshold: u64,
+	pub number_of_heaps: u32,
+	pub maximum_number_of_heaps: u32,
+	pub process_heaps: *const *const c_void,
+	pub gdi_shared_handle_table: *const c_void,
+	pub process_starter_helper: *const c_void,
+	pub gdi_dcattribute_list: u32,
+	pub padding3: [u8; 4],
+	pub loader_lock: *const c_void,
+	pub osmajor_version: u32,
+	pub osminor_version: u32,
+	pub osbuild_number: u16,
+	pub oscsdversion: u16,
+	pub osplatform_id: u32,
+	pub image_subsystem: u32,
+	pub image_subsystem_major_version: u32,
+	pub image_subsystem_minor_version: u32,
+	pub padding4: [u8; 4],
+	pub active_process_affinity_mask: u64,
+	pub gdi_handle_buffer: [u32; 60],
+	pub post_process_init_routine: extern "system" fn(),
+	pub tls_expansion_bitmap: *const c_void,
+	pub tls_expansion_bitmap_bits: [u32; 32],
+	pub session_id: u32,
+	pub padding5: [u8; 4],
+	pub app_compat_flags: u64,
+	pub app_compat_flags_user: u64,
+	pub p_shim_data: *const c_void,
+	pub app_compat_info: *const c_void,
+	pub csdversion: UnicodeString,
+	pub activation_context_data: *const c_void,
+	pub process_assembly_storage_map: *const c_void,
+	pub system_default_activation_context_data: *const c_void,
+	pub system_assembly_storage_map: *const c_void,
+	pub minimum_stack_commit: u64,
+	pub spare_pointers: [*const c_void; 2],
+	pub patch_loader_data: *const c_void,
+	pub chpe_v2process_info: *const c_void,
+	pub app_model_feature_state: u32,
+	pub spare_ulongs: [u32; 2],
+	pub active_code_page: u16,
+	pub oem_code_page: u16,
+	pub use_case_mapping: u16,
+	pub unused_nls_field: u16,
+	pub wer_registration_data: *const c_void,
+	pub wer_ship_assert_ptr: *const c_void,
+	pub ec_code_bit_map: *const c_void,
+	pub p_image_header_hash: *const c_void,
+	pub tracing_flags: u32,
+	pub padding6: [u8; 4],
+	pub csr_server_read_only_shared_memory_base: u64,
+	pub tpp_workerp_list_lock: u64,
+	pub tpp_workerp_list: ListEntry,
+	pub wait_on_address_hash_table: [*const c_void; 128],
+	pub telemetry_coverage_header: *const c_void,
+	pub cloud_file_flags: u32,
+	pub cloud_file_diag_flags: u32,
+	pub placeholder_compatibility_mode: u8,
+	pub placeholder_compatibility_mode_reserved: [u8; 7],
+	pub leap_second_data: *const c_void,
+	pub leap_second_flags: u32,
+	pub nt_global_flag2: u32,
+	pub extended_feature_disable_mask: u64,
 }
 
 
 ///
-/// The PEB_LDR_DATA structure is the defining record of which user-mode modules are loaded in a process.
-/// It is essentially the head of three double-linked lists of LDR_DATA_TABLE_ENTRY structures.
-/// Each structure represents one loaded module. Each list links through the structures in a different order.
+/// The PebLdrData structure is the defining record of which user-mode modules are loaded in a process.
 ///
+/// It is essentially the head of three double-linked lists of [LdrDataTableEntry] structures.
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct PEB_LDR_DATA {
-	pub Length: u32,
-	pub Initialized: u32,
-	pub SsHandle: *const c_void,
-	pub InLoadOrderModuleList: LIST_ENTRY,
-	pub InMemoryOrderModuleList: LIST_ENTRY,
-	pub InInitializationOrderModuleList: LIST_ENTRY,
+pub struct PebLdrData {
+	pub length: u32,
+	pub initialized: u32,
+	pub ss_handle: *const c_void,
+	pub in_load_order_module_list: ListEntry,
+	pub in_memory_order_module_list: ListEntry,
+	pub in_initialization_order_module_list: ListEntry,
 }
 
 
-/// Doubly-linked list. This structure is made to be embedded in another structure, allowing to navigate between them by following the lists links.
-/// It wraps around, meaning that Blink of the first element points to the last element.
+/// An entry in a doubly-linked list.
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct LIST_ENTRY {
+pub struct ListEntry {
 	/// Forward Link
-	pub Flink: *const LIST_ENTRY,
+	pub flink: *const ListEntry,
 
 	/// Backwards Link
-	pub Blink: *const LIST_ENTRY,
+	pub blink: *const ListEntry,
 }
 
 
-/// Single-linked list
+/// An entry in a single-linked list
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct SINGLE_LIST_ENTRY {
-	pub Next: *const SINGLE_LIST_ENTRY,
+pub struct SingleListEntry {
+	pub next: *const SingleListEntry,
 }
 
 
-/// The LDR_DATA_TABLE_ENTRY structure is NTDLL’s record of how a DLL is loaded into a process.
+/// The LdrDataTableEntry structure is the record of how a DLL is loaded into a process.
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct LDR_DATA_TABLE_ENTRY {
-	pub InLoadOrderLinks: LIST_ENTRY,
-	pub InMemoryOrderLinks: LIST_ENTRY,
-	pub InInitializationOrderLinks: LIST_ENTRY,
-	pub DllBase: *const c_void,
-	pub EntryPoint: *const c_void,
-	pub SizeOfImage: u32,
-	pub FullDllName: UNICODE_STRING,
-	pub BaseDllName: UNICODE_STRING,
-	pub FlagGroup: [u8; 4],
-	pub ObsoleteLoadCount: u16,
-	pub TlsIndex: u16,
-	pub HashLinks: LIST_ENTRY,
-	pub TimeDateStamp: u32,
-	pub EntryPointActivationContext: *const ACTIVATION_CONTEXT,
-	pub Lock: *const c_void,
-	pub DdagNode: *const LDR_DDAG_NODE,
-	pub NodeModuleLink: LIST_ENTRY,
-	pub LoadContext: *const LDRP_LOAD_CONTEXT,
-	pub ParentDllBase: *const c_void,
-	pub SwitchBackContext: *const c_void,
-	pub BaseAddressIndexNode: RTL_BALANCED_NODE,
-	pub MappingInfoIndexNode: RTL_BALANCED_NODE,
-	pub OriginalBase: u64,
-	pub LoadTime: i64,
-	pub BaseNameHashValue: u32,
-	pub LoadReason: LDR_DLL_LOAD_REASON,
-	pub ImplicitPathOptions: u32,
-	pub ReferenceCount: u32,
-	pub DependentLoadFlags: u32,
-	pub SigningLevel: u8,
-	pub CheckSum: u32,
-	pub ActivePatchImageBase: *const c_void,
-	pub HotPatchState: LDR_HOT_PATCH_STATE,
+pub struct LdrDataTableEntry {
+	pub in_load_order_links: ListEntry,
+	pub in_memory_order_links: ListEntry,
+	pub in_initialization_order_links: ListEntry,
+	pub dll_base: *const c_void,
+	pub entry_point: *const c_void,
+	pub size_of_image: u32,
+	pub full_dll_name: UnicodeString,
+	pub base_dll_name: UnicodeString,
+	pub flag_group: [u8; 4],
+	pub obsolete_load_count: u16,
+	pub tls_index: u16,
+	pub hash_links: ListEntry,
+	pub time_date_stamp: u32,
+	pub entry_point_activation_context: *const ActivationContext,
+	pub lock: *const c_void,
+	pub ddag_node: *const LdrDdagNode,
+	pub node_module_link: ListEntry,
+	pub load_context: *const LdrpLoadContext,
+	pub parent_dll_base: *const c_void,
+	pub switch_back_context: *const c_void,
+	pub base_address_index_node: RtlBalancedNode,
+	pub mapping_info_index_node: RtlBalancedNode,
+	pub original_base: u64,
+	pub load_time: i64,
+	pub base_name_hash_value: u32,
+	pub load_reason: LdrDllLoadReason,
+	pub implicit_path_options: u32,
+	pub reference_count: u32,
+	pub dependent_load_flags: u32,
+	pub signing_level: u8,
+	pub check_sum: u32,
+	pub active_patch_image_base: *const c_void,
+	pub hot_patch_state: LdrHotPatchState,
 }
 
 
 // The implementation is still a bit fucked up,
-// IDK how to properly do C-Style unions in rust
+// IDK how to properly port C-Style unions in rust
 #[repr(C)]
 #[derive(Copy, Clone)]
 pub union _KernelCallbackTable {
-	pub KernelCallbackTable: *const c_void,
-	pub UserSharedInfoPtr: *const c_void,
+	pub kernel_callback_table: *const c_void,
+	pub user_shared_info_ptr: *const c_void,
 }
 
 
@@ -234,24 +216,23 @@ impl fmt::Debug for _KernelCallbackTable {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		unsafe {
 			f.debug_set()
-			 .entry(&self.KernelCallbackTable)
-			 .entry(&self.UserSharedInfoPtr)
+				.entry(&self.kernel_callback_table)
+				.entry(&self.user_shared_info_ptr)
 			 .finish()
 		}
 	}
 }
 
 //
-// DLL LOADER ENUMS
-// and Types
+// DLL LOADER ENUMS and Types
 //
 /////////////////////////////////////////
 
-/// State of the module loader
-/// Only in LDR_DATA_TABLE_ENTRY
+/// state of the module loader
+/// Only in LdrDataTableEntry
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum LDR_DDAG_STATE {
+pub enum LdrDdagState {
 	LdrModulesMerged = -5,
 	LdrModulesInitError = -4,
 	LdrModulesSnapError = -3,
@@ -272,77 +253,72 @@ pub enum LDR_DDAG_STATE {
 
 /// Self-Explanatory
 /// Reason why the DLL is loaded
-/// Only found in LDR_DATA_TABLE_ENTRY.
+/// Only found in LdrDataTableEntry.
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum LDR_DLL_LOAD_REASON {
-	LoadReasonStaticDependency = 0,
-	LoadReasonStaticForwarderDependency = 1,
-	LoadReasonDynamicForwarderDependency = 2,
-	LoadReasonDelayloadDependency = 3,
-	LoadReasonDynamicLoad = 4,
-	LoadReasonAsImageLoad = 5,
-	LoadReasonAsDataLoad = 6,
-	LoadReasonEnclavePrimary = 7,
-	LoadReasonEnclaveDependency = 8,
-	LoadReasonPatchImage = 9,
-	LoadReasonUnknown = -1,
+pub enum LdrDllLoadReason {
+	StaticDependency = 0,
+	StaticForwarderDependency = 1,
+	DynamicForwarderDependency = 2,
+	DelayloadDependency = 3,
+	DynamicLoad = 4,
+	AsImageLoad = 5,
+	AsDataLoad = 6,
+	EnclavePrimary = 7,
+	EnclaveDependency = 8,
+	PatchImage = 9,
+	Unknown = -1,
 }
 
 
 // I genuinely have no idea what it's for
 #[repr(i32)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum LDR_HOT_PATCH_STATE {
-	LdrHotPatchBaseImage,
-	LdrHotPatchNotApplied,
-	LdrHotPatchAppliedReverse,
-	LdrHotPatchAppliedForward,
-	LdrHotPatchFailedToPatch,
-	LdrHotPatchStateMax,
+pub enum LdrHotPatchState {
+	BaseImage,
+	NotApplied,
+	AppliedReverse,
+	AppliedForward,
+	FailedToPatch,
+	StateMax,
 }
 
 
 ///
-/// Extends the LDR_DATA_TABLE_ENTRY that represents a loaded module.
+/// Extends the LdrDataTableEntry that represents a loaded module.
 ///
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct LDR_DDAG_NODE {
-	pub Modules: LIST_ENTRY,
-	pub ServiceTagList: *const LDR_SERVICE_TAG_RECORD,
-	pub LoadCount: u32,
-	pub LoadWhileUnloadingCount: u32,
-	pub LowestLink: u32,
-	pub Dependencies: LDRP_CSLIST,
-	pub IncomingDependencies: LDRP_CSLIST,
-	pub State: LDR_DDAG_STATE,
-	pub CondenseLink: SINGLE_LIST_ENTRY,
-	pub PreorderNumber: u32,
+pub struct LdrDdagNode {
+	pub modules: ListEntry,
+	pub service_tag_list: *const LdrServiceTagRecord,
+	pub load_count: u32,
+	pub load_while_unloading_count: u32,
+	pub lowest_link: u32,
+	pub dependencies: LdrpCslist,
+	pub incoming_dependencies: LdrpCslist,
+	pub state: LdrDdagState,
+	pub condense_link: SingleListEntry,
+	pub preorder_number: u32,
 }
 
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct LDR_SERVICE_TAG_RECORD {
-	pub Next: *const LDR_SERVICE_TAG_RECORD,
-	pub ServiceTag: *const u32,
+pub struct LdrServiceTagRecord {
+	pub next: *const LdrServiceTagRecord,
+	pub service_tag: *const u32,
 }
-
-
-//
-//
-//
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct LDRP_CSLIST {
-	pub Tail: *const SINGLE_LIST_ENTRY,
-}
-
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct LDRP_LOAD_CONTEXT {}
+pub struct LdrpCslist {
+	pub tail: *const SingleListEntry,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct LdrpLoadContext {}
 
 //============================================================================
 //
@@ -350,7 +326,6 @@ pub struct LDRP_LOAD_CONTEXT {}
 //
 //
 //=============================================================================
-
 ///
 /// Low-level packaging of the numerous arguments and parameters
 /// that can be specified to such Win32 API functions as CreateProcess
@@ -359,46 +334,46 @@ pub struct LDRP_LOAD_CONTEXT {}
 /// Stores the input to the RtlCreateUserProcess function.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub struct RTL_USER_PROCESS_PARAMETERS {
-	pub MaximumLength: u32,
-	pub Length: u32,
-	pub Flags: u32,
-	pub DebugFlags: u32,
-	pub ConsoleHandle: *const c_void,
-	pub ConsoleFlags: u32,
-	pub StandardInput: *const c_void,
-	pub StandardOutput: *const c_void,
-	pub StandardError: *const c_void,
-	pub CurrentDirectory: CURDIR,
-	pub DllPath: UNICODE_STRING,
-	pub ImagePathName: UNICODE_STRING,
-	pub CommandLine: UNICODE_STRING,
-	pub Environment: *const c_void,
-	pub StartingX: u32,
-	pub StartingY: u32,
-	pub CountX: u32,
-	pub CountY: u32,
-	pub CountCharsX: u32,
-	pub CountCharsY: u32,
-	pub FillAttribute: u32,
-	pub WindowFlags: u32,
-	pub ShowWindowFlags: u32,
-	pub WindowTitle: UNICODE_STRING,
-	pub DesktopInfo: UNICODE_STRING,
-	pub ShellInfo: UNICODE_STRING,
-	pub RuntimeData: UNICODE_STRING,
-	pub CurrentDirectories: [RTL_DRIVE_LETTER_CURDIR; 32],
-	pub EnvironmentSize: u64,
-	pub EnvironmentVersion: u64,
-	pub PackageDependencyData: *const c_void,
-	pub ProcessGroupId: u32,
-	pub LoaderThreads: u32,
-	pub RedirectionDllName: UNICODE_STRING,
-	pub HeapPartitionName: UNICODE_STRING,
-	pub DefaultThreadpoolCpuSetMasks: *const u64,
-	pub DefaultThreadpoolCpuSetMaskCount: u32,
-	pub DefaultThreadpoolThreadMaximum: u32,
-	pub HeapMemoryTypeMask: u32,
+pub struct RtlUserProcessParameters {
+	pub maximum_length: u32,
+	pub length: u32,
+	pub flags: u32,
+	pub debug_flags: u32,
+	pub console_handle: *const c_void,
+	pub console_flags: u32,
+	pub standard_input: *const c_void,
+	pub standard_output: *const c_void,
+	pub standard_error: *const c_void,
+	pub current_directory: CURDIR,
+	pub dll_path: UnicodeString,
+	pub image_path_name: UnicodeString,
+	pub command_line: UnicodeString,
+	pub environment: *const c_void,
+	pub starting_x: u32,
+	pub starting_y: u32,
+	pub count_x: u32,
+	pub count_y: u32,
+	pub count_chars_x: u32,
+	pub count_chars_y: u32,
+	pub fill_attribute: u32,
+	pub window_flags: u32,
+	pub show_window_flags: u32,
+	pub window_title: UnicodeString,
+	pub desktop_info: UnicodeString,
+	pub shell_info: UnicodeString,
+	pub runtime_data: UnicodeString,
+	pub current_directories: [RtlDriveLetterCurdir; 32],
+	pub environment_size: u64,
+	pub environment_version: u64,
+	pub package_dependency_data: *const c_void,
+	pub process_group_id: u32,
+	pub loader_threads: u32,
+	pub redirection_dll_name: UnicodeString,
+	pub heap_partition_name: UnicodeString,
+	pub default_threadpool_cpu_set_masks: *const u64,
+	pub default_threadpool_cpu_set_mask_count: u32,
+	pub default_threadpool_thread_maximum: u32,
+	pub heap_memory_type_mask: u32,
 }
 
 
@@ -410,11 +385,11 @@ pub struct RTL_USER_PROCESS_PARAMETERS {
 ///  Peak Microsoft
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct RTL_DRIVE_LETTER_CURDIR {
-	pub Flags: u16,
-	pub Length: u16,
-	pub TimeStamp: u32,
-	pub DosPath: UNICODE_STRING,
+pub struct RtlDriveLetterCurdir {
+	pub flags: u16,
+	pub length: u16,
+	pub time_stamp: u32,
+	pub dos_path: UnicodeString,
 }
 
 
@@ -422,20 +397,20 @@ pub struct RTL_DRIVE_LETTER_CURDIR {
 /// the other structure can be the node of a binary search tree
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct RTL_BALANCED_NODE {
-	pub Children: [*const RTL_BALANCED_NODE; 2],
-	pub ParentValue: u64,
+pub struct RtlBalancedNode {
+	pub children: [*const RtlBalancedNode; 2],
+	pub parent_value: u64,
 }
 
 
-impl RTL_BALANCED_NODE {
+impl RtlBalancedNode {
 	#[inline]
-	pub fn Left(&self) -> *const RTL_BALANCED_NODE {
-		self.Children[0]
+	pub fn left(&self) -> *const RtlBalancedNode {
+		self.children[0]
 	}
 	#[inline]
-	pub fn Right(&self) -> *const RTL_BALANCED_NODE {
-		self.Children[1]
+	pub fn right(&self) -> *const RtlBalancedNode {
+		self.children[1]
 	}
 }
 
@@ -453,8 +428,8 @@ impl RTL_BALANCED_NODE {
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct CURDIR {
-	pub DosPath: UNICODE_STRING,
-	pub Handle: *const c_void,
+	pub dos_path: UnicodeString,
+	pub handle: *const c_void,
 }
 
 
@@ -463,37 +438,37 @@ pub struct CURDIR {
 ///
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct ACTIVATION_CONTEXT {
-	pub Modules: LIST_ENTRY,
-	pub ServiceTagList: *const LDR_SERVICE_TAG_RECORD,
-	pub LoadCount: u32,
-	pub LoadWhileUnloadingCount: u32,
-	pub LowestLink: u32,
-	pub Dependencies: LDRP_CSLIST,
-	pub IncomingDependencies: LDRP_CSLIST,
-	pub State: LDR_DDAG_STATE,
-	pub CondenseLink: SINGLE_LIST_ENTRY,
-	pub PreorderNumber: u32,
+pub struct ActivationContext {
+	pub modules: ListEntry,
+	pub service_tag_list: *const LdrServiceTagRecord,
+	pub load_count: u32,
+	pub load_while_unloading_count: u32,
+	pub lowest_link: u32,
+	pub dependencies: LdrpCslist,
+	pub incoming_dependencies: LdrpCslist,
+	pub state: LdrDdagState,
+	pub condense_link: SingleListEntry,
+	pub preorder_number: u32,
 }
 
 
 #[repr(C)]
 #[derive(Copy, Clone)]
-pub struct UNICODE_STRING {
-	pub Length: u16,
-	pub MaximumLength: u16,
-	pub Buffer: *const u16,
+pub struct UnicodeString {
+	pub length: u16,
+	pub maximum_length: u16,
+	pub buffer: *const u16,
 }
 
 
 // I swear, I'm going to put a head sized hole in my desk if I ever have
 // to implement fmt::Display and Debug for a string ever again
-impl fmt::Display for UNICODE_STRING {
+impl fmt::Display for UnicodeString {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let buffer = unsafe {
 			std::slice::from_raw_parts(
-				(&self).Buffer as *const _,
-				std::cmp::min((&self.Length / 2u16) as usize, 150),
+				(&self).buffer as *const _,
+				std::cmp::min((&self.length / 2u16) as usize, 150),
 			)
 		};
 		let str = String::from_utf16_lossy(buffer);
@@ -503,7 +478,7 @@ impl fmt::Display for UNICODE_STRING {
 }
 
 
-impl fmt::Debug for UNICODE_STRING {
+impl fmt::Debug for UnicodeString {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		fmt::Display::fmt(self, f)
 	}

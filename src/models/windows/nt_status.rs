@@ -1,16 +1,12 @@
-#![allow(nonstandard_style)]
+// #![allow(nonstandard_style)]
 
 
 use std::fmt::{Display, Formatter};
 
-// The most common ones are
-// 0xc000000d, Invalid Parameter
-// 0x8000000d, Partial Copy
-
 
 #[allow(overflowing_literals)]
 #[repr(i32)]
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum NtStatus {
 	ControlCExit = 0xC000013A,
 	DbgAppNotIdle = 0xC0010002,

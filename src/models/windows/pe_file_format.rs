@@ -1,8 +1,4 @@
-#![allow(nonstandard_style)]
-// #![allow(unused)]
-
 /// All of these types are useful in some way for parsing PE Files, most specifically DLLs
-/// I could do without half of that, but I'm a completionist
 ///
 /// All the structures are marked with `#[repr(C)]` to ensure that they are laid out in memory
 /// exactly the same way as the corresponding C structure.This is necessary for
@@ -16,56 +12,251 @@
 //------------------------------------------------------------------
 pub const IMAGE_DOS_SIGNATURE: u16 = 0x5A4D;
 // MZ
-pub const IMAGE_NT_SIGNATURE: u32 = 0x00004550; // PE00
-
+pub const IMAGE_NT_SIGNATURE: u32 = 0x00004550;
+// PE00
 pub const IMAGE_ROM_OPTIONAL_HDR_MAGIC: u16 = 0x107;
 // PE File is a ROM
 pub const IMAGE_NT_OPTIONAL_HDR32_MAGIC: u16 = 0x10b;
 // PE32
-pub const IMAGE_NT_OPTIONAL_HDR64_MAGIC: u16 = 0x20b; // PE32+ meaning actually not 32bit but 64bits
+pub const IMAGE_NT_OPTIONAL_HDR64_MAGIC: u16 = 0x20b; // PE32+
 
 pub const IMAGE_NUMBEROF_DIRECTORY_ENTRIES: usize = 16;
 
 
-//
 // type definitions for 64-bits address space
 //
 #[cfg(target_pointer_width = "64")]
-pub type IMAGE_NT_HEADERS = IMAGE_NT_HEADERS64;
+pub type ImageNtHeaders = ImageNtHeaders64;
 #[cfg(target_pointer_width = "64")]
-pub type IMAGE_OPTIONAL_HEADER = IMAGE_OPTIONAL_HEADER64;
+pub type ImageOptionalHeader = ImageOptionalHeader64;
 #[cfg(target_pointer_width = "64")]
-pub type PIMAGE_OPTIONAL_HEADER = *mut IMAGE_OPTIONAL_HEADER64;
+pub type PImageOptionalHeader = *mut ImageOptionalHeader64;
 
 
 #[cfg(target_pointer_width = "64")]
 pub const IMAGE_NT_OPTIONAL_HDR_MAGIC: u16 = IMAGE_NT_OPTIONAL_HDR64_MAGIC;
 
 
-//
 // type definitions for 32-bits address space
 //
 #[cfg(not(target_pointer_width = "64"))]
-pub type IMAGE_NT_HEADERS = IMAGE_NT_HEADERS32;
+pub type ImageNtHeaders = ImageNtHeaders32;
 #[cfg(not(target_pointer_width = "64"))]
-pub type IMAGE_OPTIONAL_HEADER = IMAGE_OPTIONAL_HEADER32;
+pub type ImageOptionalHeader = ImageOptionalHeader32;
 #[cfg(not(target_pointer_width = "64"))]
-pub type PIMAGE_OPTIONAL_HEADER = *mut IMAGE_OPTIONAL_HEADER32;
+pub type PImageOptionalHeader = *mut ImageOptionalHeader32;
 
 
 #[cfg(not(target_pointer_width = "64"))]
 pub const IMAGE_NT_OPTIONAL_HDR_MAGIC: u16 = IMAGE_NT_OPTIONAL_HDR32_MAGIC;
-// Same stuff could be done using usize / isize, but I'm too lazy to care
+
 
 //------------------------------------------------------------------
 //
-//              BITFLAGS
+//              PE File headers
 //
-//  My best shot at implementing C-Style bitflags in native rust
-//  I Haven't done any methods or macro to handle the logic yet
 //------------------------------------------------------------------
-/// Characteristics of the image
-pub mod ImageFileCharacteristics {
+
+/// Dos Header
+///
+/// Represents the first bytes of any PE files
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ImageDosHeader {
+	/// magic number
+	pub e_magic: u16,
+	/// Bytes on last page of file
+	pub e_cblp: u16,
+	/// Pages in file
+	pub e_cp: u16,
+	/// Relocations
+	pub e_crlc: u16,
+	/// size of header in paragraphs
+	pub e_cparhdr: u16,
+	/// Minimum extra paragraphs needed
+	pub e_minalloc: u16,
+	/// Maximum extra paragraphs needed
+	pub e_maxalloc: u16,
+	/// Initial (relative) SS value
+	pub e_ss: u16,
+	/// Initial SP value
+	pub e_sp: u16,
+	/// Checksum
+	pub e_csum: u16,
+	/// Initial IP value
+	pub e_ip: u16,
+	/// Initial (relative) CS value
+	pub e_cs: u16,
+	/// File address of relocation table
+	pub e_lfarlc: u16,
+	/// Overlay number
+	pub e_ovno: u16,
+	/// Reserved words
+	pub e_res: [u16; 4],
+	/// OEM identifier
+	pub e_oemid: u16,
+	/// OEM information
+	pub e_oeminfo: u16,
+	/// Reserved words
+	pub e_res2: [u16; 10],
+	/// File address of the PE header
+	pub e_lfanew: u32,
+}
+
+
+//
+// 64-bits architecture-specific structures
+//
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ImageNtHeaders64 {
+	pub signature: u32,
+	pub file_header: ImageFileHeader,
+	pub optional_header: ImageOptionalHeader64,
+}
+
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ImageOptionalHeader64 {
+	pub magic: u16,
+	pub major_linker_version: u8,
+	pub minor_linker_version: u8,
+	pub size_of_code: u32,
+	pub size_of_initialized_data: u32,
+	pub size_of_uninitialized_data: u32,
+	pub address_of_entry_point: u32,
+	pub base_of_code: u32,
+	pub image_base: u64,
+	pub section_alignment: u32,
+	pub file_alignment: u32,
+	pub major_operating_system_version: u16,
+	pub minor_operating_system_version: u16,
+	pub major_image_version: u16,
+	pub minor_image_version: u16,
+	pub major_subsystem_version: u16,
+	pub minor_subsystem_version: u16,
+	pub win32version_value: u32,
+	pub size_of_image: u32,
+	pub size_of_headers: u32,
+	pub check_sum: u32,
+	pub subsystem: ImageSubsystem,
+	pub dll_characteristics: u16,
+	pub size_of_stack_reserve: u64,
+	pub size_of_stack_commit: u64,
+	pub size_of_heap_reserve: u64,
+	pub size_of_heap_commit: u64,
+	pub loader_flags: u32,
+	pub number_of_rva_and_sizes: u32,
+	pub data_directory: [ImageDataDirectory; IMAGE_NUMBEROF_DIRECTORY_ENTRIES],
+}
+
+//
+// 32-bits architecture specific structures
+//
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ImageNtHeaders32 {
+	pub signature: u32,
+	pub file_header: ImageFileHeader,
+	pub optional_header: ImageOptionalHeader32,
+}
+
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ImageOptionalHeader32 {
+	pub magic: u16,
+	pub major_linker_version: u8,
+	pub minor_linker_version: u8,
+	pub size_of_code: u32,
+	pub size_of_initialized_data: u32,
+	pub size_of_uninitialized_data: u32,
+	pub address_of_entry_point: u32,
+	pub base_of_code: u32,
+	pub base_of_data: u32,
+	pub image_base: u32,
+	pub section_alignment: u32,
+	pub file_alignment: u32,
+	pub major_operating_system_version: u16,
+	pub minor_operating_system_version: u16,
+	pub major_image_version: u16,
+	pub minor_image_version: u16,
+	pub major_subsystem_version: u16,
+	pub minor_subsystem_version: u16,
+	pub win32version_value: u32,
+	pub size_of_image: u32,
+	pub size_of_headers: u32,
+	pub check_sum: u32,
+	pub subsystem: ImageSubsystem,
+	pub dll_characteristics: u16,
+	pub size_of_stack_reserve: u32,
+	pub size_of_stack_commit: u32,
+	pub size_of_heap_reserve: u32,
+	pub size_of_heap_commit: u32,
+	pub loader_flags: u32,
+	pub number_of_rva_and_sizes: u32,
+	pub data_directory: [ImageDataDirectory; IMAGE_NUMBEROF_DIRECTORY_ENTRIES],
+}
+
+
+//
+//  OTHER GENERAL STRUCTURES FOR PE FILES
+//
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ImageFileHeader {
+	pub machine: u16,
+	pub number_of_sections: u16,
+	pub time_date_stamp: u32,
+	pub pointer_to_symbol_table: u32,
+	pub number_of_symbols: u32,
+	pub size_of_optional_header: u16,
+	pub characteristics: u16, // image_file_characteristics - 4 Bytes Bit flags - Refer to the corresponding module for more information
+}
+
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ImageDataDirectory {
+	pub virtual_address: u32,
+	pub size: u32,
+}
+
+
+/// This structure describes the export information for a Dynamic Link Library (DLL).
+/// It is used to provide information about the exported functions and their addresses.
+///
+/// All "AddressOf" fields are RVA, Relative Virtual Addresses
+/// They are offsets, in bytes, from the base address of the DLL.
+#[repr(C)]
+#[derive(Debug, Copy, Clone)]
+pub struct ImageExportDirectory {
+	pub characteristics: u32,
+	pub time_date_stamp: u32,
+	pub major_version: u16,
+	pub minor_version: u16,
+	pub name: u32,
+	pub base: u32,
+	pub number_of_functions: u32,
+	pub number_of_names: u32,
+	pub address_of_functions: u32,
+	pub address_of_names: u32,
+	pub address_of_name_ordinals: u32,
+}
+
+
+//------------------------------------------------------------------
+//   > BITFLAGS
+//
+//  C-Style bitflags don't exist natively in rust
+// They're modules because enums wouldn't be 
+// There is a crate that adds bitflags, but i don't want dependencies 
+//------------------------------------------------------------------
+
+/// characteristics of the image
+pub mod image_file_characteristics {
 	/// Relocation info stripped from file
 	pub const RELOCS_STRIPPED: u16 = 0x0001;
 
@@ -113,8 +304,8 @@ pub mod ImageFileCharacteristics {
 }
 
 
-/// DllCharacteristics Entries
-pub mod ImageDllCharacteristics {
+/// dll_characteristics Entries
+pub mod image_dll_characteristics {
 	/// Reserved.
 	pub const IMAGE_LIBRARY_PROCESS_INIT: u16 = 0x0001;
 
@@ -167,9 +358,9 @@ pub mod ImageDllCharacteristics {
 //
 //------------------------------------------------------------------
 
-/// Machine type
+/// machine type
 pub enum ImageFileMachine {
-	/// Machine type
+	/// machine type
 	Unknown = 0,
 
 	/// Intel 386
@@ -272,7 +463,7 @@ pub enum ImageDirectoryEntry {
 	/// Security Directory
 	Security = 4,
 
-	/// Base Relocation Table
+	/// base Relocation Table
 	BaseReloc = 5,
 
 	/// Debug Directory
@@ -305,7 +496,7 @@ pub enum ImageDirectoryEntry {
 
 
 #[repr(u16)]
-/// Subsystem Values
+/// subsystem Values
 #[derive(Debug, Copy, Clone)]
 pub enum ImageSubsystem {
 	/// Unknown subsystem.
@@ -349,202 +540,4 @@ pub enum ImageSubsystem {
 
 	/// Image is a Windows boot application.
 	WindowsBootApplication = 16,
-}
-
-//------------------------------------------------------------------
-//
-//              PE File headers
-//
-//------------------------------------------------------------------
-
-///
-/// DOS HEADER
-///
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct IMAGE_DOS_HEADER {
-	pub e_magic: u16,
-	// Magic number
-	pub e_cblp: u16,
-	// Bytes on last page of file
-	pub e_cp: u16,
-	// Pages in file
-	pub e_crlc: u16,
-	// Relocations
-	pub e_cparhdr: u16,
-	// Size of header in paragraphs
-	pub e_minalloc: u16,
-	// Minimum extra paragraphs needed
-	pub e_maxalloc: u16,
-	// Maximum extra paragraphs needed
-	pub e_ss: u16,
-	// Initial (relative) SS value
-	pub e_sp: u16,
-	// Initial SP value
-	pub e_csum: u16,
-	// Checksum
-	pub e_ip: u16,
-	// Initial IP value
-	pub e_cs: u16,
-	// Initial (relative) CS value
-	pub e_lfarlc: u16,
-	// File address of relocation table
-	pub e_ovno: u16,
-	// Overlay number
-	pub e_res: [u16; 4],
-	// Reserved words
-	pub e_oemid: u16,
-	// OEM identifier
-	pub e_oeminfo: u16,
-	// OEM information
-	pub e_res2: [u16; 10],
-	// Reserved words
-	pub e_lfanew: u32,      // File address of new exe header
-}
-
-//
-// 64-bits architecture specific structures for PE Files
-//
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct IMAGE_NT_HEADERS64 {
-	pub Signature: u32,
-	pub FileHeader: IMAGE_FILE_HEADER,
-	pub OptionalHeader: IMAGE_OPTIONAL_HEADER64,
-}
-
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct IMAGE_OPTIONAL_HEADER64 {
-	pub Magic: u16,
-	pub MajorLinkerVersion: u8,
-	pub MinorLinkerVersion: u8,
-	pub SizeOfCode: u32,
-	pub SizeOfInitializedData: u32,
-	pub SizeOfUninitializedData: u32,
-	pub AddressOfEntryPoint: u32,
-	pub BaseOfCode: u32,
-	pub ImageBase: u64,
-	pub SectionAlignment: u32,
-	pub FileAlignment: u32,
-	pub MajorOperatingSystemVersion: u16,
-	pub MinorOperatingSystemVersion: u16,
-	pub MajorImageVersion: u16,
-	pub MinorImageVersion: u16,
-	pub MajorSubsystemVersion: u16,
-	pub MinorSubsystemVersion: u16,
-	pub Win32VersionValue: u32,
-	pub SizeOfImage: u32,
-	pub SizeOfHeaders: u32,
-	pub CheckSum: u32,
-	pub Subsystem: ImageSubsystem,
-	// u16
-	pub DllCharacteristics: u16,
-	// ImageDllCharacteristics
-	pub SizeOfStackReserve: u64,
-	pub SizeOfStackCommit: u64,
-	pub SizeOfHeapReserve: u64,
-	pub SizeOfHeapCommit: u64,
-	pub LoaderFlags: u32,
-	pub NumberOfRvaAndSizes: u32,
-	pub DataDirectory: [IMAGE_DATA_DIRECTORY; IMAGE_NUMBEROF_DIRECTORY_ENTRIES],
-}
-
-//
-// 32-bits architecture specific structures for PE Files
-//
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct IMAGE_NT_HEADERS32 {
-	pub Signature: u32,
-	pub FileHeader: IMAGE_FILE_HEADER,
-	pub OptionalHeader: IMAGE_OPTIONAL_HEADER32,
-}
-
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct IMAGE_OPTIONAL_HEADER32 {
-	pub Magic: u16,
-	pub MajorLinkerVersion: u8,
-	pub MinorLinkerVersion: u8,
-	pub SizeOfCode: u32,
-	pub SizeOfInitializedData: u32,
-	pub SizeOfUninitializedData: u32,
-	pub AddressOfEntryPoint: u32,
-	pub BaseOfCode: u32,
-	pub BaseOfData: u32,
-	pub ImageBase: u32,
-	pub SectionAlignment: u32,
-	pub FileAlignment: u32,
-	pub MajorOperatingSystemVersion: u16,
-	pub MinorOperatingSystemVersion: u16,
-	pub MajorImageVersion: u16,
-	pub MinorImageVersion: u16,
-	pub MajorSubsystemVersion: u16,
-	pub MinorSubsystemVersion: u16,
-	pub Win32VersionValue: u32,
-	pub SizeOfImage: u32,
-	pub SizeOfHeaders: u32,
-	pub CheckSum: u32,
-	pub Subsystem: ImageSubsystem,
-	// u16
-	pub DllCharacteristics: u16,
-	// ImageDllCharacteristics - 4 Bytes bitflag - Refer to the corresponding module for more information
-	pub SizeOfStackReserve: u32,
-	pub SizeOfStackCommit: u32,
-	pub SizeOfHeapReserve: u32,
-	pub SizeOfHeapCommit: u32,
-	pub LoaderFlags: u32,
-	pub NumberOfRvaAndSizes: u32,
-	pub DataDirectory: [IMAGE_DATA_DIRECTORY; IMAGE_NUMBEROF_DIRECTORY_ENTRIES],
-}
-
-
-//
-//  OTHER GENERAL STRUCTURES FOR PE FILES
-//
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct IMAGE_FILE_HEADER {
-	pub Machine: u16,
-	pub NumberOfSections: u16,
-	pub TimeDateStamp: u32,
-	pub PointerToSymbolTable: u32,
-	pub NumberOfSymbols: u32,
-	pub SizeOfOptionalHeader: u16,
-	pub Characteristics: u16, // ImageFileCharacteristics - 4 Bytes Bit flags - Refer to the corresponding module for more information
-}
-
-
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct IMAGE_DATA_DIRECTORY {
-	pub VirtualAddress: u32,
-	pub Size: u32,
-}
-
-
-/// This structure describes the export information for a Dynamic Link Library (DLL).
-/// It is used to provide information about the exported functions and their addresses.
-///
-/// All "AddressOf" fields are RVA, Relative Virtual Addresses
-/// They are offsets, in bytes, from the base address of the DLL.
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct IMAGE_EXPORT_DIRECTORY {
-	pub Characteristics: u32,
-	pub TimeDateStamp: u32,
-	pub MajorVersion: u16,
-	pub MinorVersion: u16,
-	pub Name: u32,
-	pub Base: u32,
-	pub NumberOfFunctions: u32,
-	pub NumberOfNames: u32,
-	pub AddressOfFunctions: u32,
-	pub AddressOfNames: u32,
-	pub AddressOfNameOrdinals: u32,
 }
