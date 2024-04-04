@@ -1,3 +1,6 @@
+use crate::peb_walk::get_teb_address;
+
+
 pub mod processes;
 
 
@@ -60,29 +63,49 @@ pub unsafe fn get_current_directory() -> String {
 }
 
 
-// Always nice to have those:
+// The niceties:
+
+/// Returns the computer name by reading `USERDOMAIN` environment variable
 pub fn get_computer_name() -> String {
 	get_environment_var("USERDOMAIN").unwrap()
 }
 
 
+/// Returns the current username by reading `USERNAME` environment variable
 pub fn get_username() -> String {
 	get_environment_var("USERNAME").unwrap()
 }
 
 
+/// Returns the path to tmp directory by reading `TEMP` environment variable
 pub fn get_temp() -> String {
 	get_environment_var("TEMP").unwrap()
 }
 
 
+/// Returns the path to %APPDATA% by reading `APPDATA` environment variable
 pub fn get_appdata() -> String {
 	get_environment_var("APPDATA").unwrap()
 }
 
 
+/// Returns the path to windows directory by reading `windir` environment variable
 pub fn get_windir() -> String {
 	get_environment_var("windir").unwrap()
+}
+
+
+/// Reads the current process ID from the Thread Environment Block
+pub fn get_process_id() -> u64 {
+	let tib = get_teb_address();
+	unsafe { (*tib).client_id.unique_process as u64 }
+}
+
+
+/// Reads the current thread ID from the Thread Environment Block
+pub fn get_thread_id() -> u64 {
+	let tib = get_teb_address();
+	unsafe { (*tib).client_id.unique_thread as u64 }
 }
 
 
