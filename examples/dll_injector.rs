@@ -11,7 +11,7 @@ use thermite::{debug, error, info};
 use thermite::indirect_syscall as syscall;
 use thermite::models::windows::*;
 use thermite::models::windows::nt_status::NtStatus;
-use thermite::models::windows::peb_teb::UNICODE_STRING;
+use thermite::models::windows::peb_teb::UnicodeString;
 use thermite::peb_walk::{get_function_address, get_module_address};
 
 
@@ -41,9 +41,8 @@ fn main() {
 
 	// We also perform additional checks to make sure the path is correct
 	if dll.is_file().not()
-		|| dll.is_absolute().not()
-		|| dll.extension().is_some_and(|ext| { ext.eq_ignore_ascii_case("dll") }).not() {
-		error!("Please provide an absolute path to a valid DLL file.");
+		|| dll.is_absolute().not() {
+		error!("Please provide an absolute path to your DLL.");
 		process::exit(NtStatus::StatusAssertionFailure as _);
 	}
 
@@ -64,14 +63,12 @@ fn injector(pid: u32, dll_path: &str) {
 		unique_thread: 0 as _,
 	};
 
-
 	syscall!("NtOpenProcess",
 	    &mut process_handle, //  [out]          PHANDLE            ProcessHandle,
 	    PROCESS_ALL_ACCESS,  //  [in]           ACCESS_MASK        DesiredAccess,
 	    &oa_process,         //  [in]           POBJECT_ATTRIBUTES ObjectAttributes,
-	    &client_id);         //  [in, optional] PCLIENT_ID         ClientId
-
-
+	    &client_id);         //  [in, optional] PCLIENT_ID         client_id
+	
 	let mut buf_size: usize = dll_path.len();
 	let mut base_addr: *mut c_void = 0u32 as _;
 
@@ -82,7 +79,6 @@ fn injector(pid: u32, dll_path: &str) {
 	    &mut buf_size,            // [in, out] PSIZE_T  RegionSize,
 	    MEM_COMMIT | MEM_RESERVE, // [in]      ULONG    AllocationType,
 	    PAGE_READWRITE);          // [in]      ULONG    Protect
-
 	info!("Allocated {} bytes of memory at address {:#x?}", buf_size, base_addr);
 
 	// Copy the DLL Path to newly allocated memory
@@ -90,10 +86,9 @@ fn injector(pid: u32, dll_path: &str) {
 	syscall!("NtWriteVirtualMemory",
 	    process_handle,      // [in]            HANDLE ProcessHandle,
 	    base_addr,           // [in]            PVOID  *BaseAddress,
-	    dll_path.as_ptr(),   // [in]            PVOID  Buffer,
+	    dll_path.as_ptr(),   // [in]            PVOID  buffer,
 	    buf_size,            // [in]            ULONG  NumberOfBytesToWrite,
 	    &mut bytes_written); // [out, optional] PULONG NumberOfBytesWritten ,
-
 	info!("Successfully written {} bytes in remote memory", buf_size);
 
 	// Change protection status of allocated memory to READ+EXECUTE
@@ -126,17 +121,15 @@ fn injector(pid: u32, dll_path: &str) {
 	    null::<*mut c_void>(), // [in, optional] SIZE_T MaximumStackSize,
 	    null::<*mut c_void>());// [in, optional] PVOID AttributeList
 
-
 	// Wait for the thread to execute
 	// Timeout is a null pointer, so we wait indefinitely
 	syscall!("NtWaitForSingleObject",
-	    thread_handle,          //  [in] HANDLE         Handle,
+	    thread_handle,          //  [in] HANDLE         handle,
 	    0,                      //  [in] BOOLEAN        Alertable,
 	    null::<*mut u64>());    //  [in] PLARGE_INTEGER Timeout
 
-
 	// Close the handle
 	syscall!("NtClose",
-	    thread_handle); // [in] HANDLE Handle
+	    thread_handle); // [in] HANDLE handle
 
 }

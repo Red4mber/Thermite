@@ -3,7 +3,7 @@ use thermite::models::{Export, Syscall};
 use thermite::peb_walk::{get_all_exported_functions, get_function_address, get_module_address};
 use thermite::syscalls::find_ssn;
 
-/* This example is a demonstration of FreshyCalls's technique to retrieve hooked syscall IDs.
+/* This example is a demonstration of Freshycalls 's technique to retrieve hooked syscall IDs.
 
 Since on most versions of windows, all syscalls are in order, we can easily derive the syscall ID from their addresses.
 We only need to find every syscalls and sort our list of syscalls using their addresses.
@@ -43,7 +43,7 @@ fn main() {
 		.iter()
 		.filter(|x1| x1.name.starts_with("Nt") && !x1.name.starts_with("Ntdll"))
 		.collect();
-	let mut control: Vec<Syscall> = verif_all_exports.iter().filter_map(|x| {
+	let mut control: Vec<Syscall> = verif_all_exports.iter().filter_map(|x| unsafe {
 		find_ssn(x.address).map(|ssn| Syscall {
 			name: x.name.clone(),
 			address: x.address,

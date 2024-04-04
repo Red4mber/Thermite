@@ -39,7 +39,7 @@ pub fn find_ssn(addr: *const u8) -> Option<u16> {
 }
 
 
-/// If a syscall is hooked, seek up and down until it finds a clean syscall
+/// Seeks up and down until it finds a clean syscall
 /// Then subtract(or add, depending on the direction) the number of functions hopped to get the ssn
 /// This method only work if syscall are incrementally numbered
 unsafe fn halos_gate(addr: *const u8) -> Option<u16> {

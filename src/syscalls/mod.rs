@@ -12,23 +12,27 @@ pub mod indirect;
 
 /// Reads the syscall number from a syscall stub.
 ///
+/// # Summary
 /// Iterates over the bytes of the syscall stub to find the pattern :
 /// `[0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00]`
+/// If the pattern matches, we return the SSN
 ///
-/// If the pattern matches, we join the two bytes together and return the SSN
+/// If the first byte of the syscall is a `JMP` instruction (`[0xe9]`), this syscall is hooked
+/// so we call the [halos_gate] function to find the syscall ID using it's neighbors syscall ID.
 ///
-/// If we don't find these bytes, it's either not a valid syscall address, either it has been hooked
+/// If we don't find these bytes, it's probably not a valid syscall address
 /// We cannot recover the SSN so we just return None
 ///
 /// # Arguments
+/// - `addr` : The address of the syscall in ntdll.dll, it can be obtained using [`get_function_address`]
 ///
-/// - `syscall_addr` : The address of the function we are looking for, can be obtained with [`get_function_address`]
+/// # Safety
+/// Behavior is undefined if the address provided does not correspond to a valid syscall address.
 ///
-pub fn find_ssn(addr: *const u8) -> Option<u16> {
-	match unsafe { ptr::read(addr as *const [u8; 8]) } {
-		// Begins with JMP => Probably hooked
-		[0xe9, ..] | [_, 0xe9, ..] | [_, _, 0xe9, ..] => {
-			return unsafe { halos_gate(addr) };
+pub unsafe fn find_ssn(addr: *const u8) -> Option<u16> {
+	match ptr::read(addr as *const [u8; 8]) {
+		[0xe9, ..] => {
+			return halos_gate(addr);
 		}
 		[0x4c, 0x8b, 0xd1, 0xb8, ssn_1, ssn_2, 0x00, 0x00] => {
 			let ssn = ((ssn_2 as u16) << 8) + ssn_1 as u16;
@@ -41,9 +45,20 @@ pub fn find_ssn(addr: *const u8) -> Option<u16> {
 }
 
 
-/// If a syscall is hooked, seek up and down until it finds a clean syscall
-/// Then subtract(or add, depending on the direction) the number of functions hopped to get the ssn
-/// This method only work if syscall are incrementally numbered
+/// Finds out a hooked syscall ID using other syscalls around it
+///
+/// # Summary
+/// The function seeks its neighbors up and down until it finds one that is not hooked.
+///
+/// Then, subtract(or add, depending on the direction) the number of syscalls "hopped" to the ID of
+/// this syscall to get the hooked syscall ID we needed.
+///
+/// This method only work if syscall are incrementally numbered, which should be the case on most windows versions.
+///
+/// # Safety
+///
+/// Behavior is undefined if the address provided does not correspond to a valid syscall address.
+///
 pub unsafe fn halos_gate(addr: *const u8) -> Option<u16> {
 	for i in 1..500 {
 		let up = find_ssn(addr.byte_offset(32 * i));
@@ -63,8 +78,9 @@ pub unsafe fn halos_gate(addr: *const u8) -> Option<u16> {
 }
 
 
-/// Searches for every syscalls using the provided pattern
-/// It then executes the find_ssn function on every one of them to retrieve their syscall numbers
+/// Searches the export table of ntdll for syscalls using the provided matching function
+///
+/// It then executes the `find_ssn` function to filter syscalls
 ///
 /// Returns a vector of [Syscall] containing the matches
 ///
@@ -122,24 +138,36 @@ pub unsafe fn find_single_ssn(name: &str) -> Option<u16> {
 }
 
 
-// /// Macro to handle the output of the syscalls and cast it as NT_STATUS
-// /// Using a homemade NT_STATUS enum i copied from windows headers, it's missing a few values
-// ///
-// /// WARNING It can, and WILL panic
-// #[macro_export] macro_rules! check_status {
-//      ($str:literal, $status:expr) => {{
-//         let nt_status: NtStatus = unsafe { mem::transmute($status) };
-//         match nt_status {
-//             NtStatus::StatusSuccess => {
-//                 info!("{}: {}", $str, nt_status);
-//             },
-//             NtStatus::StatusInfoLengthMismatch => {
-//                 info!("{}: {}", $str, nt_status);
-//             },
-//             _ => {
-//                 error!("PANIC ! {} status: {}\nQuitting program...", $str, nt_status);
-//                 process::exit(nt_status as _);
-//             }
-//         }
-//      }};
-//  }
+/// Retrieve every syscalls.
+///
+
+/// Get a list of every syscalls by searching Ntdll.dll for functions starting with "Nt", then sorts
+/// the syscalls array by addresses and fill the syscalls IDs using their position in the list.
+///
+/// Returns a Vec<[Syscall]>
+///
+/// # Notes
+/// This technique only works if the syscalls are incrementally numbered,
+/// which should be the case on most windows versions.
+///
+pub fn get_ssns_by_sorting() -> Vec<Syscall> {
+	// First we get an array of every function exported by ntdll starting with "Nt"
+	let ntdll_handle = unsafe { get_module_address("ntdll.dll") }.unwrap();
+	let binding = unsafe { get_all_exported_functions(ntdll_handle) }.unwrap();
+	let mut all_exports: Vec<&Export> = binding
+		.iter()
+		.filter(|x1| x1.name.starts_with("Nt") && !x1.name.starts_with("Ntdll"))
+		.collect();
+
+	// We sort every function by its address
+	all_exports.sort_by(|a, b| a.address.cmp(&b.address));
+	// We then simply number every function
+	return all_exports.iter().enumerate()
+	                  .map(|(idx, &ex)| {
+		                  Syscall {
+			                  address: ex.address,
+			                  name: ex.name.clone(),
+			                  ssn: idx as u16,
+		                  }
+	                  }).collect();
+}

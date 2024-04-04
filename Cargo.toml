@@ -10,7 +10,6 @@ doc = true
 crate-type = ["lib"]
 
 [dependencies]
-log = "0.4.21"
 
 
 

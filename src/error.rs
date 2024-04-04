@@ -6,7 +6,7 @@ use std::str::Utf8Error;
 
 /// Errors occurring during the parsing of DLLs
 pub enum DllParserError {
-	/// Failed to retrieve a pointer to the Process Environment Block (PEB).
+	/// Failed to retrieve a pointer to the Process environment Block (PEB).
 	PebError,
 	/// The requested function was not found.
 	FunctionNotFound,
@@ -25,7 +25,7 @@ impl fmt::Display for DllParserError {
 			Self::PebError => write!(f, "Invalid PEB pointer"),
 			Self::FunctionNotFound => write!(f, "The requested function was not found"),
 			Self::FunctionNameParsingError(err) => write!(f, "Failed to parse function name : {err}"),
-			Self::InvalidNtHeader => write!(f, "Failed to parse module: Invalid NT Signature"),
+			Self::InvalidNtHeader => write!(f, "Failed to parse module: Invalid NT signature"),
 			Self::ModuleNotFound => write!(f, "The requested module was not found"),
 		}
 	}
