@@ -3,18 +3,22 @@
 A malware development project written entirely in Rust.
 
 Despite the presentation as a library, only goal is to learn stuff, I don't really plan for it to be more than a collection of scripts and functions. 
+I mostly do it for the sake of learning cool stuff.
 
 ## Summary
 
-What is already done ?
+What is done yet ?
 
 * PEB Walking and enumeration using custom implementation of GetModuleHandle/GetProcAddress
 * Direct syscalls with dynamic syscall ID retrieval using a mix of techniques such as Hell's Gates and Halo's Gate/Tartarus gate.
 * Indirect syscalls (now with syscall sorting to retrieve SSNs o/)
+* Hooking via Hardware breakpoints (Patchless AMSI Bypass soon)
+
+Not much yet, but i've been working on it for around two weeks so give it time ^^
 
 I am also currently working on various other techniques such as process enumeration, etw/amsi patching, PPID spoofing etc… Everything is not online yet, but I try to update the repository as regularly as possible.
 
-### Go check out the code :D
+##### Just go check out the code :D
 
 The goal of this project is to teach myself malware development, this is why I took care to document everything and wrote detailed comments and documentation.
 
