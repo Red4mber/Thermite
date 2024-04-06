@@ -70,8 +70,8 @@ pub enum ThermiteError {
 impl fmt::Display for ThermiteError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		match self {
-			Self::DllParserError(err) => write!(f, "{}", err.to_string()),
-			Self::SyscallError(err) => write!(f, "{}", err.to_string()),
+			Self::DllParserError(err) => write!(f, "{}", err),
+			Self::SyscallError(err) => write!(f, "{}", err),
 		}
 	}
 }

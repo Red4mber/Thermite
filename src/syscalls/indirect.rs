@@ -57,12 +57,11 @@ extern "C" {
 macro_rules! indirect_syscall {
     ($name:literal $(, $args:expr)* $(,)?) => {
          unsafe {
-            let _status: i32 = $crate::syscalls::indirect::indirect_stub(
+            $crate::syscalls::indirect::indirect_stub(
                 $crate::syscalls::find_single_ssn($name).unwrap(),
                 $crate::count_args!($($args),*),
                 $crate::syscalls::indirect::find_single_syscall_addr(),
-                $($args),* );
-            core::mem::transmute::<i32, $crate::models::windows::nt_status::NtStatus>(_status)
+                $($args),* )
         }
     }
 }

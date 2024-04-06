@@ -1,4 +1,5 @@
 use crate::peb_walk::get_teb_address;
+use crate::utils::handle_unicode_string;
 
 
 pub mod processes;
@@ -13,8 +14,8 @@ pub mod processes;
 /// Returns a vector containing every environment variables as `String` (with the format "KEY=value")
 pub unsafe fn get_environment() -> Vec<String> {
 	let peb_ptr = thermite::peb_walk::get_peb_address();
-	let length = (*(*peb_ptr).process_parameters).environment_size as usize / 2;
-	let env_ptr = (*(*peb_ptr).process_parameters).environment;
+	let length = (*(*peb_ptr).ProcessParameters).EnvironmentSize as usize / 2;
+	let env_ptr = (*(*peb_ptr).ProcessParameters).Environment;
 
 	let buffer = std::slice::from_raw_parts(
 		env_ptr as *const _, length);
@@ -46,7 +47,7 @@ pub fn get_environment_var(var: &str) -> Option<String> {
 /// The command line as a `String`
 pub unsafe fn get_command_line() -> String {
 	let peb_ptr = thermite::peb_walk::get_peb_address();
-	(*(*peb_ptr).process_parameters).command_line.to_string()
+	handle_unicode_string((*(*peb_ptr).ProcessParameters).CommandLine)
 }
 
 
@@ -59,7 +60,7 @@ pub unsafe fn get_command_line() -> String {
 /// The current working directory as a `String`
 pub unsafe fn get_current_directory() -> String {
 	let peb_ptr = thermite::peb_walk::get_peb_address();
-	(*(*peb_ptr).process_parameters).current_directory.dos_path.to_string()
+	handle_unicode_string((*(*peb_ptr).ProcessParameters).CurrentDirectory.DosPath)
 }
 
 
@@ -98,14 +99,14 @@ pub fn get_windir() -> String {
 /// Reads the current process ID from the Thread Environment Block
 pub fn get_process_id() -> u64 {
 	let tib = get_teb_address();
-	unsafe { (*tib).client_id.unique_process as u64 }
+	unsafe { (*tib).ClientId.UniqueProcess as u64 }
 }
 
 
 /// Reads the current thread ID from the Thread Environment Block
 pub fn get_thread_id() -> u64 {
 	let tib = get_teb_address();
-	unsafe { (*tib).client_id.unique_thread as u64 }
+	unsafe { (*tib).ClientId.UniqueThread as u64 }
 }
 
 

@@ -1,3 +1,6 @@
+use winapi::um::winnt::PAGE_EXECUTE_READWRITE;
+
+use thermite::indirect_syscall as syscall;
 // Patching EtwEventWrite by writing a ret instruction at the start of the function
 //
 // https://nyameeeain.medium.com/etw-bypassing-with-custom-binary-together-e2249e2f5b02
@@ -6,12 +9,7 @@
 // https://shellz.club/posts/a-novel-method-for-bypass-ETW/
 // TODO => Implement stuff from this article ^
 // TODO Hardware breakpoints
-
-use std::mem;
-
 use thermite::info;
-use thermite::indirect_syscall as syscall;
-use thermite::models::windows::*;
 use thermite::peb_walk::{get_function_address, get_module_address};
 
 

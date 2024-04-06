@@ -1,8 +1,12 @@
+use std::ptr::null_mut;
+
+use ntapi::ntexapi::{PSYSTEM_PROCESS_INFORMATION, SystemProcessInformation};
+use ntapi::ntpsapi::NtCurrentProcess;
+use winapi::um::winnt::{MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE, PVOID};
+
 use crate::indirect_syscall as syscall;
 use crate::info;
-use crate::models::windows::{MEM_COMMIT, MEM_RESERVE, NT_CURRENT_PROCESS, PAGE_EXECUTE_READWRITE};
-use crate::models::windows::system_info::SystemInformationClass;
-use crate::models::windows::system_info::SystemProcessInformation;
+use crate::utils::handle_unicode_string;
 
 
 /// This function returns a pointer to the system process information table.
@@ -11,21 +15,20 @@ use crate::models::windows::system_info::SystemProcessInformation;
 ///
 /// # Returns  
 /// A raw pointer to the [SystemProcessInformation] table.
-pub fn get_process_info() -> *const SystemProcessInformation {
-	let mut buffer: *mut std::ffi::c_void = 0u32 as _;
+pub fn get_process_info() -> PSYSTEM_PROCESS_INFORMATION {
+	let mut buffer: PVOID = null_mut();
 	let mut buf_size: isize = 0;
 
-	let info_class = SystemInformationClass::SystemProcessInformation;
 	// We need to call the NtQuerySystemInformation once to get the size of the buffer needed to store its output
 	syscall!("NtQuerySystemInformation",
-	    info_class,                    // [in]            SystemInformationClass SystemInformationClass // (0x05) for processes
+	    SystemProcessInformation,      // [in]            SystemInformationClass SystemInformationClass // (0x05) for processes
 	    0,                             // [in, out]       PVOID                    SystemInformation,
 	    0,                             // [in]            ULONG                    SystemInformationLength,
 	    &mut buf_size);                // [out, optional] PULONG                   ReturnLength
 
 	// We now need to allocate a buffer for the result of the function
 	syscall!("NtAllocateVirtualMemory",
-        NT_CURRENT_PROCESS,         // [in]      HANDLE    ProcessHandle,
+        NtCurrentProcess,           // [in]      HANDLE    ProcessHandle,
         &mut buffer,                // [in, out] PVOID     *BaseAddress,
         0u32,                       // [in]      PULONG    ZeroBits,
         &mut buf_size,              // [in, out] PSIZE_T   RegionSize,
@@ -36,12 +39,12 @@ pub fn get_process_info() -> *const SystemProcessInformation {
 	// We can now make a second call, this time with teh memory already allocated to store the result
 	let mut buf_size_2: isize = 0;
 	syscall!("NtQuerySystemInformation",
-	    info_class,                    // [in]            SystemInformationClass SystemInformationClass,
+	    SystemProcessInformation,                    // [in]            SystemInformationClass SystemInformationClass,
 	    buffer as *mut _,              // [in, out]       PVOID                    SystemInformation,
 	    buf_size,                      // [in]            ULONG                    SystemInformationLength,
 	    &mut buf_size_2);              // [out, optional] PULONG                   ReturnLength
 
-	(buffer as *mut _) as *const SystemProcessInformation
+	(buffer as *mut _) as PSYSTEM_PROCESS_INFORMATION
 }
 
 
@@ -51,40 +54,33 @@ pub fn get_process_info() -> *const SystemProcessInformation {
 /// - the process name, String
 /// - the process PID, usize
 /// - a pointer to the process information, *const SystemProcessInformation
-///
-/// ### Safety
-///
-/// blah blah blah unsafe
-/// I write those mostly so that clippy stops screaming tbh
-pub unsafe fn enumerate_processes(proc_info_ptr: *const SystemProcessInformation) -> Vec<(String, usize, *const SystemProcessInformation)> {
-	let name = (*proc_info_ptr).image_name.to_string();
-	let pid = (*proc_info_ptr).unique_process_id as usize;
+pub fn enumerate_processes(proc_info_ptr: PSYSTEM_PROCESS_INFORMATION) -> Vec<(String, usize, PSYSTEM_PROCESS_INFORMATION)> {
+	let proc_info = unsafe { *proc_info_ptr };
+	let name = handle_unicode_string(proc_info.ImageName); // (*proc_info_ptr).ImageName.to_string();
+	let pid = proc_info.UniqueProcessId as usize;
 	let ptr = proc_info_ptr;
 
-	let mut procs: Vec<(String, usize, *const _)> = Vec::new();
+	let mut procs: Vec<(String, usize, PSYSTEM_PROCESS_INFORMATION)> = Vec::new();
 	procs.push((name, pid, ptr));
 
-	let next = (*proc_info_ptr).next_entry_offset;
+	let next = proc_info.NextEntryOffset;
 	if next == 0 {
 		return procs;
 	}
-	let mut vec2 = enumerate_processes(proc_info_ptr.byte_offset(next as isize));
+	let mut vec2 = enumerate_processes(unsafe { proc_info_ptr.byte_offset(next as isize) });
 	procs.append(&mut vec2);
-	return procs;
+	procs
 }
 
 
 /// This function iterates over every [SystemProcessInformation] entry until it finds one with the matching name
-///
-/// ### Safety
-///
-/// This function is unsafe because it must dereference raw pointer to SystemProcessInformation.
-pub unsafe fn find_process_by_name(name: &str, proc_info_ptr: *const SystemProcessInformation) -> Option<*const SystemProcessInformation> {
-	let proc_name = (*proc_info_ptr).image_name.to_string();
+pub fn find_process_by_name(name: &str, proc_info_ptr: PSYSTEM_PROCESS_INFORMATION) -> Option<PSYSTEM_PROCESS_INFORMATION> {
+	let proc_info = unsafe { *proc_info_ptr };
+	let proc_name = handle_unicode_string(proc_info.ImageName);
 	if name.to_string().eq_ignore_ascii_case(&proc_name) {
 		return Some(proc_info_ptr);
 	}
 
-	let next = (*proc_info_ptr).next_entry_offset;
-	if next.ne(&0) { find_process_by_name(name, proc_info_ptr.byte_offset(next as isize)) } else { None }
+	let next = proc_info.NextEntryOffset;
+	if next.ne(&0) { unsafe { find_process_by_name(name, proc_info_ptr.byte_offset(next as isize)) } } else { None }
 }

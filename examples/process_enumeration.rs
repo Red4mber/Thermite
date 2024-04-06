@@ -1,12 +1,14 @@
 #[allow(unused)]
 use core::mem;
+use thermite::utils::handle_unicode_string;
+
+use ntapi::ntexapi::SYSTEM_PROCESS_INFORMATION;
 
 use thermite::enumeration::*;
 use thermite::info;
-use thermite::models::windows::system_info::SystemProcessInformation;
 
 
-/// Small stucture to represent a process
+/// Small structure to represent a process
 /// Each [Syscall] struct contains the following fields:
 ///
 /// * `PID` - The process ID (`usize`).
@@ -17,7 +19,7 @@ use thermite::models::windows::system_info::SystemProcessInformation;
 pub struct Process {
 	pub pid: usize,
 	pub name: String,
-	pub proc_info: *const SystemProcessInformation,
+	pub proc_info: *const SYSTEM_PROCESS_INFORMATION,
 	pub threads: Vec<Thread>,
 }
 #[derive(Debug)]
@@ -35,7 +37,7 @@ fn main() {
 	
 	// Searching for a specific process
 	let process_name = "Notepad.exe";
-	match unsafe { processes::find_process_by_name(process_name, sys_proc_info_ptr) } {
+	match processes::find_process_by_name(process_name, sys_proc_info_ptr) {
 		None => info!("Process {} not found", process_name),
 		Some(process) => {
 			info!("{} Info :\n{:#?}", process_name, unsafe { read_process_info(process) });
@@ -43,7 +45,7 @@ fn main() {
 	};
 
 	// Enumerate all processes
-	let processes = unsafe { processes::enumerate_processes(sys_proc_info_ptr) };
+	let processes = processes::enumerate_processes(sys_proc_info_ptr);
 	for process in processes {
 		println!("\t<{}> {}", process.1, process.0)
 	}
@@ -70,20 +72,20 @@ fn main() {
 
 // This function reads a process information  and returns a `Process` structure
 //
-unsafe fn read_process_info(proc_info_ptr: *const SystemProcessInformation) -> Process {
-	let mut threads = (*proc_info_ptr).threads.to_vec();
-	threads.set_len((*proc_info_ptr).number_of_threads as usize);
+unsafe fn read_process_info(proc_info_ptr: *const SYSTEM_PROCESS_INFORMATION) -> Process {
+	let mut threads = (*proc_info_ptr).Threads.to_vec();
+	threads.set_len((*proc_info_ptr).NumberOfThreads as usize);
 
 	Process {
-		pid: (*proc_info_ptr).unique_process_id as _,
-		name: (*proc_info_ptr).image_name.to_string(),
+		pid: (*proc_info_ptr).UniqueProcessId as _,
+		name: handle_unicode_string((*proc_info_ptr).ImageName),
 		proc_info: proc_info_ptr,
 		threads: threads.iter().map(|thr| {
 			Thread {
-				thread_id: thr.client_id.unique_thread as _,
-				start_address: thr.start_address as _,
-				priority: thr.priority,
-				state: thr.thread_state,
+				thread_id: thr.ClientId.UniqueThread as _,
+				start_address: thr.StartAddress as _,
+				priority: thr.Priority,
+				state: thr.ThreadState,
 			}
 		}).collect()
 	}

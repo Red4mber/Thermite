@@ -2,4 +2,5 @@ target
 .idea
 .local
 *.lock
-examples/tests_structs_offsets.rs
+examples/local_tests.rs
+examples/test_*

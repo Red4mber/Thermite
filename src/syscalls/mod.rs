@@ -2,13 +2,29 @@ use std::ptr;
 
 use crate::error::DllParserError;
 use crate::info;
-use crate::models::{Export, Syscall};
-use crate::peb_walk::{get_all_exported_functions, get_function_address, get_module_address};
+use crate::peb_walk::{ExportedFunction, get_all_exported_functions, get_function_address, get_module_address};
 
 
 pub mod direct;
 pub mod indirect;
 
+
+
+
+
+
+/// Represents a syscall, we mostly only need the name and System Service Number
+/// Each [Syscall] struct contains the following fields:
+///
+/// * `name` - The name of the corresponding function function in Ntdll (`String`).
+/// * `address` - The address of the corresponding function in Ntdll (`*const u8`).
+/// * `ssn` - The ID of the syscall (`u16`).
+#[derive(Debug, Clone)]
+pub struct Syscall {
+	pub name: String,
+	pub address: *const u8,
+	pub ssn: u16,
+}
 
 /// Reads the syscall number from a syscall stub.
 ///
@@ -85,7 +101,7 @@ pub unsafe fn halos_gate(addr: *const u8) -> Option<u16> {
 /// Returns a vector of [Syscall] containing the matches
 ///
 pub fn search(
-	filter_fn: fn(&&Export) -> bool,
+	filter_fn: fn(&&ExportedFunction) -> bool,
 	find_ssn: fn(*const u8) -> Option<u16>,
 ) -> Result<Vec<Syscall>, DllParserError> {
 	let ntdll_handle = unsafe { get_module_address("ntdll.dll") }?;
@@ -100,7 +116,7 @@ pub fn search(
 			})
 		})
 		.collect();
-	return Ok(result);
+	Ok(result)
 }
 
 // This macro takes in any two elements separated by a space replace them by the second one
@@ -130,6 +146,10 @@ macro_rules! count_args {
 /// First finds the address of the ntdll.dll module
 /// Then finds the function address in the exports table
 /// Then tries to read the syscall number from the bytes of the function
+/// 
+/// ## Safety
+/// So that clippy shuts up
+/// I'll write better doc later  TODO
 pub unsafe fn find_single_ssn(name: &str) -> Option<u16> {
 	let func_ptr = get_function_address(
 		name, get_module_address("ntdll.dll").unwrap(),
@@ -154,7 +174,7 @@ pub fn get_ssns_by_sorting() -> Vec<Syscall> {
 	// First we get an array of every function exported by ntdll starting with "Nt"
 	let ntdll_handle = unsafe { get_module_address("ntdll.dll") }.unwrap();
 	let binding = unsafe { get_all_exported_functions(ntdll_handle) }.unwrap();
-	let mut all_exports: Vec<&Export> = binding
+	let mut all_exports: Vec<&ExportedFunction> = binding
 		.iter()
 		.filter(|x1| x1.name.starts_with("Nt") && !x1.name.starts_with("Ntdll"))
 		.collect();
