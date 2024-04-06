@@ -8,6 +8,7 @@ pub mod peb_walk;
 pub mod syscalls;
 pub mod enumeration;
 pub mod utils;
+pub mod breakpoints;
 
 
 // Some cool stuff to maybe check out later:
