@@ -1,6 +1,8 @@
 #![allow(unused)]
 
-use std::ffi::{c_void, CString};
+
+use std::ffi::{c_char, c_void, CString};
+// use std::intrinsics::mir::Call;
 use std::ptr::null_mut;
 
 use ntapi::ntpsapi::{NtGetContextThread, NtSetContextThread};
@@ -12,18 +14,18 @@ use winapi::shared::windef::HWND;
 use winapi::um::errhandlingapi::{AddVectoredExceptionHandler, RemoveVectoredExceptionHandler};
 use winapi::um::libloaderapi::LoadLibraryA;
 use winapi::um::minwinbase::EXCEPTION_SINGLE_STEP;
-use winapi::um::winnt::{CONTEXT, CONTEXT_ALL, HANDLE, LPCSTR, LPCWSTR, PCONTEXT, PCSTR, PEXCEPTION_POINTERS, PVOID};
+use winapi::um::winnt::{CONTEXT, CONTEXT_ALL, CONTEXT_DEBUG_REGISTERS, HANDLE, LPCSTR, LPCWSTR, PCONTEXT, PCSTR, PEXCEPTION_POINTERS, PVOID};
 use winapi::um::winuser;
 use winapi::um::winuser::{MB_OK, MessageBoxA, MessageBoxW};
+use winapi::vc::excpt::{EXCEPTION_CONTINUE_EXECUTION, EXCEPTION_CONTINUE_SEARCH};
 
 use thermite::{debug, error, indirect_syscall as syscall, info};
 use thermite::peb_walk::{get_function_address, get_module_address, get_teb_address};
 
-use winapi::vc::excpt::{EXCEPTION_CONTINUE_EXECUTION,EXCEPTION_CONTINUE_SEARCH};
 
+static mut HOOK_ADDRESS: *mut u8 = null_mut();
 
-static mut HOOKED_FUNCTION: *mut u8 = null_mut();
-
+static mut HOOK_CALLBACKS: [*const ();4] = [&(), &(), &(), &()];
 
 #[repr(u64)]
 enum BitMasks {
@@ -63,18 +65,9 @@ fn status_to_string(status: i32) -> String {
 		_ => { format!("unknown oopsie: {:x?}", status).to_string() }
 	}
 }
-//
-// fn get_context(ctx: PCONTEXT) -> CONTEXT {
-// 	let nt_status = unsafe { NtGetContextThread(NtCurrentThread, ctx) };
-// 	unsafe { *ctx }
-// }
-//
-// fn set_context(ctx: PCONTEXT) -> i32 {
-// 	let nt_status = unsafe { NtSetContextThread(NtCurrentThread, ctx) };
-// 	nt_status
-// }
 
-fn set_breakpoint(dr: DebugRegister, address: *mut u8, ctx: &mut CONTEXT) {
+
+fn set_breakpoint(dr: DebugRegister, address: *mut u8, ctx: &mut CONTEXT, callback: *const ()) {
 	println!("Setting up breakpoint {:?} for address {:?}", dr, address);
 	let mask: u64 = match dr {
 		DebugRegister::DR0 => {
@@ -102,21 +95,26 @@ fn set_breakpoint(dr: DebugRegister, address: *mut u8, ctx: &mut CONTEXT) {
 			} else { error!("DR3 Register isn't empty !"); return; }
 		},
 	};
+	unsafe { HOOK_CALLBACKS[dr as usize] = callback; }
+
 	ctx.Dr7 |= mask;
 	ctx.Dr6 = 0;
 
 }
 
+
+/// Removes a breakpoint from the DR7 register
 fn remove_breakpoint(dr: DebugRegister, ctx: &mut CONTEXT) {
 	let mask: u64 = match dr {
-		DebugRegister::DR0 => { ctx.Dr0 = 0x00; BitMasks::L0 as u64 | BitMasks::LEN0 as u64 },
-		DebugRegister::DR1 => { ctx.Dr1 = 0x00; BitMasks::L1 as u64 | BitMasks::LEN1 as u64 },
-		DebugRegister::DR2 => { ctx.Dr2 = 0x00; BitMasks::L2 as u64 | BitMasks::LEN2 as u64 },
-		DebugRegister::DR3 => { ctx.Dr3 = 0x00; BitMasks::L3 as u64 | BitMasks::LEN3 as u64 },
+		DebugRegister::DR0 => { ctx.Dr0 = 0x00; BitMasks::L0 as u64 | BitMasks::LEN0 as u64 | BitMasks::CND0 as u64 },
+		DebugRegister::DR1 => { ctx.Dr1 = 0x00; BitMasks::L1 as u64 | BitMasks::LEN1 as u64 | BitMasks::CND1 as u64 },
+		DebugRegister::DR2 => { ctx.Dr2 = 0x00; BitMasks::L2 as u64 | BitMasks::LEN2 as u64 | BitMasks::CND2 as u64 },
+		DebugRegister::DR3 => { ctx.Dr3 = 0x00; BitMasks::L3 as u64 | BitMasks::LEN3 as u64 | BitMasks::CND3 as u64 },
 	};
-	// debug!(mask);
 	ctx.Dr7 &= !mask;
-	// debug!(ctx.Dr0,ctx.Dr1,ctx.Dr2,ctx.Dr3,ctx.Dr7);
+	ctx.Dr6 = 0;
+	ctx.EFlags = 0;
+
 }
 
 fn remove_all_breakpoints(ctx: &mut CONTEXT) {
@@ -128,6 +126,9 @@ fn remove_all_breakpoints(ctx: &mut CONTEXT) {
 	ctx.Dr7 = 0;
 	ctx.EFlags = 0;
 }
+
+
+
 
 fn search_breakpoint(address: PVOID, ctx: &CONTEXT) -> Option<DebugRegister> {
 	if address as u64 == ctx.Dr0 { Some(DebugRegister::DR0) }
@@ -152,17 +153,17 @@ fn main() {
 		let user32 = LoadLibraryA(CString::new("User32.dll").unwrap().as_ptr());
 
 		let messageboxa_address = get_function_address("MessageBoxA", user32 as _).unwrap();
-		HOOKED_FUNCTION = messageboxa_address as _;
+		HOOK_ADDRESS = messageboxa_address as _;
 	}
 
 
 	let mut ctx: CONTEXT = unsafe { std::mem::zeroed() };
+	ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 	ctx.ContextFlags = CONTEXT_ALL;
-
 	unsafe {
 		let status = NtGetContextThread(NtCurrentThread, &mut ctx);
 		if status != 0 { debug!(status); };
-		set_breakpoint(DebugRegister::DR0, HOOKED_FUNCTION, &mut ctx);
+		set_breakpoint(DebugRegister::DR0, HOOK_ADDRESS, &mut ctx, hook2 as _);
 
 		let status = NtSetContextThread(NtCurrentThread, &mut ctx);
 		if status != 0 { debug!(status); };
@@ -171,11 +172,14 @@ fn main() {
 	unsafe {
 		MessageBoxA(
 			0 as _,
-			0 as _,
+			"NOT THE HOOK\0".as_ptr() as _,
 			0 as _,
 			0
 		);
 	}
+	info!("We back to main o/");
+	remove_breakpoint(DebugRegister::DR0, &mut ctx);
+
 	let ret = unsafe { RemoveVectoredExceptionHandler(handler) };
 	if ret == 0 { error!("Failed to remove exception handler") }
 }
@@ -183,38 +187,80 @@ fn main() {
 unsafe extern "system" fn vectored_handler(mut exception_info: PEXCEPTION_POINTERS) -> i32 {
 	unsafe {
 		let rec = &(*(*exception_info).ExceptionRecord);
-		let ctx = &mut (*(*exception_info).ContextRecord);
+		let mut ctx = &mut (*(*exception_info).ContextRecord);
 
-		if rec.ExceptionCode == EXCEPTION_SINGLE_STEP && rec.ExceptionAddress == HOOKED_FUNCTION as PVOID {
+		if rec.ExceptionCode == EXCEPTION_SINGLE_STEP && search_breakpoint(rec.ExceptionAddress, ctx).is_some() {
 			info!("Successfully hooked o//");
+
+			// A bit of dark magic, as a treat
+			let hook_ptr = HOOK_CALLBACKS[search_breakpoint(rec.ExceptionAddress, ctx).unwrap() as usize];
+			let hook_func = unsafe { std::mem::transmute::<*const (), fn(&mut CONTEXT)>(hook_ptr) };
+
+
 
 			// ctx.Dr7 = 0;
 			// ctx.Dr0 = 0;
-			// // NtSetContextThread(NtCurrentThread, ctx);
 
-			debug!(ctx.Dr0, ctx.Dr7);
+			// debug!(ctx.Dr0, ctx.Dr6, ctx.Dr7);
 
-			hook();
 
-			// set_breakpoint(DebugRegister::DR0, HOOKED_FUNCTION, ctx);
-			// NtSetContextThread(NtCurrentThread, ctx);
+			// return EXCEPTION_CONTINUE_EXECUTION;
+			// remove_breakpoint(DebugRegister::DR0, ctx);
+
+			// debug!(NtSetContextThread(NtCurrentThread, &mut *ctx));
+
+			// debug!(ctx.ContextFlags);
+
+			hook_func(ctx);
+
+
+
+			// set_breakpoint(DebugRegister::DR0, HOOKED_FUNCTION, &mut ctx);
+			// NtSetContextThread(NtCurrentThread, &mut ctx);
 			// debug!(ctx.Dr0, ctx.Dr7);
 
 			return EXCEPTION_CONTINUE_EXECUTION;
-		} else {
-			debug!("not the breakpoint");
 		}
 		return EXCEPTION_CONTINUE_SEARCH;
 	}
 }
+static RET_OPCODE: &[u8] = &[0xC3];
 
-unsafe fn hook() {
+unsafe fn hook2(ctx: &mut CONTEXT) {
+	println!("test hook 2");
+
+
+	// // Prevents execution for the hooked function by changing its instruction pointer to a RET instruction
+	// // Sadly it also result in a a STATUS_ACCESS_VIOLATION exception
+	// ctx.Rip = RET_OPCODE.as_ptr() as u64;
+
+	// // Getting the return address of the hooked function and changing its instruction pointer to it
+	// ctx.Rip = *(ctx.Rsp as *const u64);
+	// // Stack Overflow :C   Well.. it's successful at preventing execution at least
+
+	// Let try again but this time correcting the stack pointer
+	ctx.Rip = *(ctx.Rsp as *const u64);
+	ctx.Rsp += std::mem::size_of::<*const u64>() as u64;
+	// OMG NO STACK OVERFLOW
+
+
+
+	ctx.EFlags |= 1<<16;
+	// ctx.EFlags &= !(1<<16); // To turn off this bit (for testing)
+}
+
+
+fn hook(ctx: &mut CONTEXT) {
 	println!("This is the hook");
-	MessageBoxW(
-		0 as _,
-		"HOOK\0".encode_utf16().collect::<Vec<_>>().as_ptr(),
-		0 as _,
-		0
-	);
+
+	// For some reason, accessing those arguments cause a STATUS_ACCESS_VIOLATION exception
+	debug!(ctx.Rdx); // Argument 2, the message of the messagebox
+	let message = unsafe { CString::from_raw(ctx.Rdx as *mut c_char) };
+	debug!(message);
+
+
+	//  Allows the hooked function to resume execution
+	// See : http://www.c-jump.com/CIS77/ASM/Instructions/I77_0070_eflags_bits.htm
+	ctx.EFlags |= 1<<16;
 }
 
