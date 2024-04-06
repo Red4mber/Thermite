@@ -1,11 +1,11 @@
 #[allow(unused)]
 use core::mem;
-use thermite::utils::handle_unicode_string;
 
 use ntapi::ntexapi::SYSTEM_PROCESS_INFORMATION;
 
 use thermite::enumeration::*;
 use thermite::info;
+use thermite::utils::handle_unicode_string;
 
 
 /// Small structure to represent a process
