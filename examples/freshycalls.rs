@@ -1,5 +1,5 @@
 use thermite::error;
-use thermite::peb_walk::{ExportedFunction, get_all_exported_functions, get_module_address};
+use thermite::peb_walk::{ExportedFunction, get_all_exported_functions, get_module_handle};
 use thermite::syscalls::find_ssn;
 use thermite::syscalls::Syscall;
 
@@ -15,7 +15,7 @@ to make sure the SSN we found we all valid, and lo and behold, they all were.
 
 fn main() {
 	// First we get an array of every function exported by ntdll starting by "Nt"
-	let ntdll_handle = unsafe { get_module_address("ntdll.dll") }.unwrap();
+	let ntdll_handle = unsafe { get_module_handle("ntdll.dll") }.unwrap();
 	let binding = unsafe { get_all_exported_functions(ntdll_handle) }.unwrap();
 
 	let mut all_exports: Vec<&ExportedFunction> = binding

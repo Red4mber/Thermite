@@ -10,7 +10,7 @@ use thermite::indirect_syscall as syscall;
 // TODO => Implement stuff from this article ^
 // TODO Hardware breakpoints
 use thermite::info;
-use thermite::peb_walk::{get_function_address, get_module_address};
+use thermite::peb_walk::{get_function_address, get_module_handle};
 
 
 fn main() {
@@ -26,7 +26,7 @@ fn local_etw_patcher() {
 	let mut new_protec: u32 = 0;
 	let patch: char = char::from(0xc3);
 
-	let ntdll_handle = unsafe { get_module_address("ntdll.dll") }.unwrap();
+	let ntdll_handle = unsafe { get_module_handle("ntdll.dll") }.unwrap();
 	let mut etw_handle = unsafe { get_function_address("EtwEventWrite", ntdll_handle) }.unwrap();
 
 	// First we unprotect the memory region hosting the EtwEventWrite function

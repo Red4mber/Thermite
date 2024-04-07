@@ -2,7 +2,7 @@ use std::ptr;
 
 use crate::error::DllParserError;
 use crate::info;
-use crate::peb_walk::{ExportedFunction, get_all_exported_functions, get_function_address, get_module_address};
+use crate::peb_walk::{ExportedFunction, get_all_exported_functions, get_function_address, get_module_handle};
 
 
 pub mod direct;
@@ -104,7 +104,7 @@ pub fn search(
 	filter_fn: fn(&&ExportedFunction) -> bool,
 	find_ssn: fn(*const u8) -> Option<u16>,
 ) -> Result<Vec<Syscall>, DllParserError> {
-	let ntdll_handle = unsafe { get_module_address("ntdll.dll") }?;
+	let ntdll_handle = unsafe { get_module_handle("ntdll.dll") }?;
 	let result: Vec<Syscall> = unsafe { get_all_exported_functions(ntdll_handle) }?
 		.iter()
 		.filter(filter_fn)
@@ -152,7 +152,7 @@ macro_rules! count_args {
 /// I'll write better doc later  TODO
 pub unsafe fn find_single_ssn(name: &str) -> Option<u16> {
 	let func_ptr = get_function_address(
-		name, get_module_address("ntdll.dll").unwrap(),
+		name, get_module_handle("ntdll.dll").unwrap(),
 	).expect("Function not found in the export table");
 	find_ssn(func_ptr)
 }
@@ -172,7 +172,7 @@ pub unsafe fn find_single_ssn(name: &str) -> Option<u16> {
 ///
 pub fn get_ssns_by_sorting() -> Vec<Syscall> {
 	// First we get an array of every function exported by ntdll starting with "Nt"
-	let ntdll_handle = unsafe { get_module_address("ntdll.dll") }.unwrap();
+	let ntdll_handle = unsafe { get_module_handle("ntdll.dll") }.unwrap();
 	let binding = unsafe { get_all_exported_functions(ntdll_handle) }.unwrap();
 	let mut all_exports: Vec<&ExportedFunction> = binding
 		.iter()

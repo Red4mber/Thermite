@@ -1,7 +1,7 @@
 use std::arch::global_asm;
 use std::ptr;
 
-use crate::peb_walk::{get_all_exported_functions, get_module_address};
+use crate::peb_walk::{get_all_exported_functions, get_module_handle};
 
 // https://stackoverflow.com/questions/49928950/acceptability-of-regular-usage-of-r10-and-r11
 // https://www.reddit.com/r/asm/comments/j4mofq/why_cant_you_clobber_certain_registers/
@@ -74,7 +74,7 @@ macro_rules! indirect_syscall {
 ///
 pub unsafe fn find_single_syscall_addr() -> *const u8 {
 	get_all_exported_functions(
-		get_module_address("ntdll.dll").unwrap()
+		get_module_handle("ntdll.dll").unwrap()
 	).unwrap().iter().find(|x| {
 		let syscall_ptr = x.address.byte_offset(18);
 		ptr::read(syscall_ptr as *const [u8; 2]).eq(&[0x0f, 0x05])

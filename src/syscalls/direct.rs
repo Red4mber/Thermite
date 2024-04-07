@@ -77,11 +77,10 @@ extern "C" {
 macro_rules! direct_syscall {
     ($name:literal $(, $args:expr)* $(,)?) => {
          unsafe {
-            let _status = $crate::syscalls::direct::direct_stub(
+            $crate::syscalls::direct::direct_stub(
                 $crate::syscalls::find_single_ssn($name).unwrap(),
                 thermite::count_args!($($args),*),
-                $($args),* );
-            mem::transmute::<i32, $crate::models::windows::nt_status::NtStatus>(_status)
+                $($args),* )
         }
     }
 }

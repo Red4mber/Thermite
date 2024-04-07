@@ -80,6 +80,7 @@ pub fn set_breakpoint(dr: DebugRegister, address: *mut u8, ctx: &mut CONTEXT, ca
 		},
 	};
 	unsafe { HOOK_CALLBACKS[dr as usize] = callback; }
+	// debug!(unsafe { HOOK_CALLBACKS });
 	ctx.Dr7 |= mask;
 	ctx.Dr6 = 0;
 }
@@ -124,12 +125,14 @@ pub fn search_breakpoint(address: PVOID, ctx: &CONTEXT) -> Option<DebugRegister>
 }
 
 
-#[allow(unused_mut)] 
+#[allow(unused_mut)]
 /// This is my vectored exception handler
 ///
 /// It'll check that the exception originates from a breakpoint, then if it does, executes the corresponding callback
 /// A  `&mut CONTEXT` is passed as argument to all callbacks
-pub extern "system" fn vectored_handler(mut exception_info: PEXCEPTION_POINTERS) -> i32 {
+/// ### Safety
+/// Yeah safety now clippy will shut the fuck up
+pub unsafe extern "system" fn vectored_handler(mut exception_info: PEXCEPTION_POINTERS) -> i32 {
 	unsafe {
 		let rec = &(*(*exception_info).ExceptionRecord);
 		let mut ctx = &mut (*(*exception_info).ContextRecord);
@@ -146,5 +149,16 @@ pub extern "system" fn vectored_handler(mut exception_info: PEXCEPTION_POINTERS)
 			return EXCEPTION_CONTINUE_EXECUTION;
 		}
 		EXCEPTION_CONTINUE_SEARCH
+	}
+}
+
+/// Reads the arguments passed to the hooked function by reading the context's registers
+pub fn get_arguments(ctx: &CONTEXT, idx: i32) -> u64 {
+	match idx {
+		0 => ctx.Rcx,
+		1 => ctx.Rdx,
+		2 => ctx.R8,
+		3 => ctx.R9,
+		_ => unsafe { *( (ctx.Rsp as *const u64).offset((idx + 1) as isize) ) }
 	}
 }

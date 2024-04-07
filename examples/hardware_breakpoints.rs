@@ -27,7 +27,10 @@ fn main() {
 
 		messageboxa_address = get_function_address("MessageBoxA", user32 as _).unwrap().cast_mut();
 	} // i'm using my own getprocadress nut i don't have a custom implementation of loadlibrary yet
-
+	
+	debug!(messageboxa_address, MessageBoxA as *const u8);
+	
+	
 	// Now that we have the address of a function to target,
 	// Let's prepare the thread context to set up a breakpoint 
 	let mut ctx: CONTEXT = unsafe { std::mem::zeroed() };

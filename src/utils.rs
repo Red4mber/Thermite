@@ -44,6 +44,9 @@ macro_rules! _debug_print {
     () => {
         println!("[?-?] - [{}:{}:{}]", file!(), line!(), column!());
     };
+    ($lit:literal) => {
+        println!("[?-?] {}", $lit);
+    };
     ($($val:expr$(,)?)*) => {
         println!("[?-?] - [{}:{}:{}]", file!(), line!(), column!());
         $({$crate::_debug_print!($val)})*;
@@ -51,7 +54,6 @@ macro_rules! _debug_print {
 }
 
 #[macro_export] macro_rules! info {
-    // When just a string, simply print it
     ($lit:literal) => {
         println!("[^-^] {}", $lit);
     };
@@ -65,7 +67,7 @@ macro_rules! _debug_print {
 
 #[macro_export] macro_rules! error {
     ($arg:literal) => {
-        println!("[TwT] [{}:{}:{}] \n\t => {}", file!(), line!(), column!(), $arg);
+        println!("[TwT] {}", file!(), line!(), column!(), $arg);
     };
     ($arg:expr) => {
         println!("[TwT] [{}:{}:{}] \n\t => {} => {}", file!(), line!(), column!(), stringify!($arg), $arg);

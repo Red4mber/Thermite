@@ -2,7 +2,7 @@
 //! Module containing all functions related to PEB Walking and DLL parsing :
 //!
 /// Functions in this module:
-/// [get_peb_address], [get_module_address], [list_all_loaded_modules], [parse_export_directory],
+/// [get_peb_address], [get_module_handle], [list_all_loaded_modules], [parse_export_directory],
 /// [get_all_exported_functions], [get_function_address]
 
 use std::arch::asm;
@@ -11,6 +11,7 @@ use std::slice;
 
 use ntapi::ntldr::LDR_DATA_TABLE_ENTRY;
 use ntapi::ntpebteb::{PEB, TEB};
+use winapi::shared::minwindef::HMODULE;
 use winapi::um::winnt::{IMAGE_EXPORT_DIRECTORY, IMAGE_NT_HEADERS, IMAGE_NT_SIGNATURE};
 
 use crate::error::DllParserError;
@@ -91,12 +92,12 @@ pub fn get_peb_address() -> *const PEB {
 /// ## Example
 /// ```
 /// let module_name = "kernel32.dll";
-/// match unsafe { thermite::peb_walk::get_module_address(module_name) } {
+/// match unsafe { thermite::peb_walk::get_module_handle(module_name) } {
 ///     Ok(base_address) => println!("[^-^] Module base address: {:?}", base_address),
 ///     Err(error) => eprintln!("[TwT] Error: {:?}", error),
 /// };
 /// ```
-pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllParserError> {
+pub unsafe fn get_module_handle(module_name: &str) -> Result<HMODULE, DllParserError> {
 	// Get the address of the Process environment Block (PEB)
 	let peb = get_peb_address();
 
@@ -122,7 +123,7 @@ pub unsafe fn get_module_address(module_name: &str) -> Result<*const u8, DllPars
 		if base_dll_name.eq_ignore_ascii_case(module_name) {
 			// Get the module's base address and return it
 			let module_base_address = (*module_base).DllBase;
-			return Ok(module_base_address as *const u8);
+			return Ok(module_base_address as _);
 		}
 
 		// Move to the next module in the list
@@ -179,8 +180,9 @@ type ExportsDir<'a> = (IMAGE_EXPORT_DIRECTORY, &'a [u32], &'a [u16], &'a [u32]);
 ///
 /// Mostly just made to avoid having to repeat this code in every function that need them
 unsafe fn parse_export_directory<'a>(
-	base_address: *const u8,
+	module_handle: HMODULE
 ) -> Result<ExportsDir<'a>, DllParserError> {
+	let base_address = module_handle as *const u8;
 	// Get the offset to the NT headers from the PE header
 	let nt_offset = base_address.byte_offset(0x03c);
 
@@ -242,7 +244,7 @@ unsafe fn parse_export_directory<'a>(
 ///
 /// # Example
 /// ```
-/// let module_address = unsafe { thermite::peb_walk::get_module_address("ntdll.dll") }.unwrap();
+/// let module_address = unsafe { thermite::peb_walk::get_module_handle("ntdll.dll") }.unwrap();
 ///
 /// let result = unsafe {
 ///     thermite::peb_walk::get_function_address("NtOpenProcess", module_address)
@@ -254,21 +256,21 @@ unsafe fn parse_export_directory<'a>(
 /// ```
 pub unsafe fn get_function_address(
 	function_name: &str,
-	base_address: *const u8,
+	module_handle: HMODULE
 ) -> Result<*const u8, DllParserError> {
 	let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
-		parse_export_directory(base_address)?;
+		parse_export_directory(module_handle)?;
 
 	// We're searching by name, so we iterate over the list of names
 	for (i, name_addr) in address_of_names.iter().enumerate() {
 		// Then match over the result of CStr::from_ptr to capture eventual errors
-		match CStr::from_ptr((base_address as usize + *name_addr as usize) as *const i8).to_str() {
+		match CStr::from_ptr((module_handle as usize + *name_addr as usize) as *const i8).to_str() {
 			Ok(s) => {
 				// If it's ok, we test if our strings match
 				if s.eq_ignore_ascii_case(function_name) {
 					// if it does, we return the address of the function
 					let rva = address_of_functions[address_of_name_ordinals[i] as usize];
-					let true_address = (base_address as usize + rva as usize) as *const u8;
+					let true_address = (module_handle as usize + rva as usize) as *const u8;
 					return Ok(true_address);
 				}
 			}
@@ -305,24 +307,24 @@ pub unsafe fn get_function_address(
 /// use thermite::peb_walk::{ExportedFunction, get_all_exported_functions};
 ///
 /// // Get the address of a loaded DLL
-/// let module_address = unsafe { thermite::peb_walk::get_module_address("ntdll.dll") }.unwrap();
+/// let module_address = unsafe { thermite::peb_walk::get_module_handle("ntdll.dll") }.unwrap();
 /// // Retrieve vec of exported functions
 /// let mut exported_functions: Vec<ExportedFunction> = unsafe { get_all_exported_functions(module_address) }.unwrap();
 /// ```
 pub unsafe fn get_all_exported_functions(
-	base_address: *const u8,
+	module_handle: HMODULE
 ) -> Result<Vec<ExportedFunction>, DllParserError> {
 	let (_, address_of_functions, address_of_name_ordinals, address_of_names) =
-		parse_export_directory(base_address)?;
+		parse_export_directory(module_handle)?;
 	let mut exported_functions = Vec::new();
 	// We iterate over the list of names
 	for (i, name_addr) in address_of_names.iter().enumerate() {
 		// Then match over the result of CStr::from_ptr to capture eventual errors
-		match CStr::from_ptr((base_address as usize + *name_addr as usize) as *const i8).to_str() {
+		match CStr::from_ptr((module_handle as usize + *name_addr as usize) as *const i8).to_str() {
 			Ok(function_name) => {
 				// Get the address of the function
 				let rva = address_of_functions[address_of_name_ordinals[i] as usize];
-				let true_address = (base_address as usize + rva as usize) as *const u8;
+				let true_address = (module_handle as usize + rva as usize) as *const u8;
 				// Push the functions name and address to the return vector
 				exported_functions.push(ExportedFunction {
 					name: function_name.to_owned(),

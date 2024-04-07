@@ -15,7 +15,7 @@ use winapi::um::winnt::{GENERIC_EXECUTE, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_R
 
 use thermite::{debug, error, info};
 use thermite::indirect_syscall as syscall;
-use thermite::peb_walk::{get_function_address, get_module_address};
+use thermite::peb_walk::{get_function_address, get_module_handle};
 
 
 #[repr(C)]
@@ -122,7 +122,7 @@ fn injector(pid: u32, dll_path: &str) {
 
 
 	let load_library_ptr = unsafe {
-		let kernel32_ptr = get_module_address("kernel32.dll").unwrap();
+		let kernel32_ptr = get_module_handle("kernel32.dll").unwrap();
 		get_function_address("LoadLibraryA", kernel32_ptr).unwrap()
 	};
 	// Create a remote thread in target process
