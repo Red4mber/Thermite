@@ -5,13 +5,13 @@ use winapi::vc::excpt::{EXCEPTION_CONTINUE_EXECUTION, EXCEPTION_CONTINUE_SEARCH}
 use crate::{error, info};
 
 
-static mut HOOK_CALLBACKS: [*const ();4] = [&(), &(), &(), &()];
-
-
+/// Stores the function pointers of each hook callback
+/// There are 4 for the 4 different breakpoints we can set up
+/// They are set by the [set_breakpoint] function and used by our vectore exception handler [vectored_handler], which dispatches the calls to their respective callback
+static mut HWBP_CALLBACK_TABLE: [*const ();4] = [&(), &(), &(), &()];
 
 
 // ENUMS
-
 /// Represents the various flags and fields found in the DR7 register
 /// Serves mostly as Bitmasks to make DR7 easier to configure
 ///
@@ -51,38 +51,34 @@ pub enum DebugRegister { DR0 = 0, DR1 = 1, DR2 = 2, DR3 = 3 }
 /// The address can be any valid address
 /// The context must be a valid context and must be a mutable reference
 /// The callback function is a function pointer, it can be of any type, just cast it using `*const _`
-pub fn set_breakpoint(dr: DebugRegister, address: *mut u8, ctx: &mut CONTEXT, callback: *const ()) {
+pub fn set_breakpoint(dr: DebugRegister, address: *const u8, ctx: &mut CONTEXT, callback: *const fn()) {
 	println!("Setting up breakpoint {:?} for address {:?}", dr, address);
-	let mask: u64 = match dr {
+	match dr { // First we check if the register is empty, if not, return early
 		DebugRegister::DR0 => {
-			if ctx.Dr0 == 0 {
-				ctx.Dr0 = address as u64;
-				DR7::L0 as u64 | DR7::LEN0 as u64
-			} else { error!("DR0 Register isn't empty !"); return; }
+			if ctx.Dr0 != 0 { error!("DR0 Register isn't empty !"); return; } else { ctx.Dr0 = address as u64 }
 		},
 		DebugRegister::DR1 => {
-			if ctx.Dr1 == 0 {
-				ctx.Dr1 = address as u64;
-				DR7::L1 as u64 | DR7::LEN1 as u64
-			} else { error!("DR1 Register isn't empty !"); return; }
+			if ctx.Dr1 != 0 { error!("DR1 Register isn't empty !"); return; } else { ctx.Dr1 = address as u64 }
 		},
 		DebugRegister::DR2 => {
-			if ctx.Dr2 == 0 {
-				ctx.Dr2 = address as u64;
-				DR7::L2 as u64 | DR7::LEN2 as u64
-			} else { error!("DR2 Register isn't empty !"); return; }
+			if ctx.Dr2 != 0 { error!("DR2 Register isn't empty !"); return; } else { ctx.Dr2 = address as u64 }
 		},
 		DebugRegister::DR3 => {
-			if ctx.Dr3 == 0 {
-				ctx.Dr3 = address as u64;
-				DR7::L3 as u64 | DR7::LEN3 as u64
-			} else { error!("DR3 Register isn't empty !"); return; }
+			if ctx.Dr3 != 0 { error!("DR3 Register isn't empty !"); return; } else { ctx.Dr3 = address as u64 }
 		},
 	};
-	unsafe { HOOK_CALLBACKS[dr as usize] = callback; }
-	// debug!(unsafe { HOOK_CALLBACKS });
-	ctx.Dr7 |= mask;
-	ctx.Dr6 = 0;
+
+
+	// Calculate which bits need to be turned on depending on the register
+	let n: u64 = dr as u64;
+	let l: u64 = n*2;               // Local breakpoints enable
+	let _g: u64 = l+1;              // Global breakpoints enable
+	let _cnd: u64 = 16+n*4;         // Conditions - we'll see if i add support for that
+	let len: u64 = 18+n*4;          // Length of address - only use 64bits so far, so 0b11
+	ctx.Dr7 |= l|len|(len+1);    // combine flags we use in a mask - the local enable | address length 0b11
+	ctx.Dr6 = 0;                 // Then zero DR6 for good figure
+	unsafe { HWBP_CALLBACK_TABLE[n as usize] = callback as _; }
+	// debug!(unsafe { HWBP_CALLBACK_TABLE });
 }
 
 /// Removes a breakpoint from the DR7 register
@@ -141,10 +137,9 @@ pub unsafe extern "system" fn vectored_handler(mut exception_info: PEXCEPTION_PO
 			info!("Successfully hooked o//");
 
 			// A bit of dark magic, as a treat
-			let hook_ptr = HOOK_CALLBACKS[search_breakpoint(rec.ExceptionAddress, ctx).unwrap() as usize];
-			let hook_func = std::mem::transmute::<*const (), fn(&mut CONTEXT)>(hook_ptr);
+			let callback_ptr = HWBP_CALLBACK_TABLE[search_breakpoint(rec.ExceptionAddress, ctx).unwrap() as usize];
+			std::mem::transmute::<*const (), fn(&mut CONTEXT)>(callback_ptr)(ctx);
 
-			hook_func(ctx);
 
 			return EXCEPTION_CONTINUE_EXECUTION;
 		}
@@ -161,4 +156,13 @@ pub fn get_arguments(ctx: &CONTEXT, idx: i32) -> u64 {
 		3 => ctx.R9,
 		_ => unsafe { *( (ctx.Rsp as *const u64).offset((idx + 1) as isize) ) }
 	}
+}
+
+pub fn set_ret_value(value: u64, ctx: &mut CONTEXT) { ctx.Rax = value; }
+
+pub fn set_resume_flag(ctx: &mut CONTEXT) { ctx.EFlags |= 1<<16; }
+
+pub fn rip_to_return_address(ctx: &mut CONTEXT) {
+	unsafe { ctx.Rip = *(ctx.Rsp as *const u64); }
+	ctx.Rsp += std::mem::size_of::<*const u64>() as u64;
 }

