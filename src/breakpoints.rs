@@ -2,7 +2,7 @@ use winapi::um::minwinbase::EXCEPTION_SINGLE_STEP;
 use winapi::um::winnt::{CONTEXT, PEXCEPTION_POINTERS, PVOID};
 use winapi::vc::excpt::{EXCEPTION_CONTINUE_EXECUTION, EXCEPTION_CONTINUE_SEARCH};
 
-use crate::{error, info};
+use crate::{debug, error};
 
 
 /// Stores the function pointers of each hook callback
@@ -53,18 +53,19 @@ pub enum DebugRegister { DR0 = 0, DR1 = 1, DR2 = 2, DR3 = 3 }
 /// The callback function is a function pointer, it can be of any type, just cast it using `*const _`
 pub fn set_breakpoint(dr: DebugRegister, address: *const u8, ctx: &mut CONTEXT, callback: *const fn()) {
 	println!("Setting up breakpoint {:?} for address {:?}", dr, address);
-	match dr { // First we check if the register is empty, if not, return early
+	register_callback(dr, callback);
+	match dr {
 		DebugRegister::DR0 => {
-			if ctx.Dr0 != 0 { error!("DR0 Register isn't empty !"); return; } else { ctx.Dr0 = address as u64 }
+			if ctx.Dr0 != 0 { error!("DR0 isn't empty !"); return; } else { ctx.Dr0 = address as u64 }
 		},
 		DebugRegister::DR1 => {
-			if ctx.Dr1 != 0 { error!("DR1 Register isn't empty !"); return; } else { ctx.Dr1 = address as u64 }
+			if ctx.Dr1 != 0 { error!("DR1 isn't empty !"); return; } else { ctx.Dr1 = address as u64 }
 		},
 		DebugRegister::DR2 => {
-			if ctx.Dr2 != 0 { error!("DR2 Register isn't empty !"); return; } else { ctx.Dr2 = address as u64 }
+			if ctx.Dr2 != 0 { error!("DR2 isn't empty !"); return; } else { ctx.Dr2 = address as u64 }
 		},
 		DebugRegister::DR3 => {
-			if ctx.Dr3 != 0 { error!("DR3 Register isn't empty !"); return; } else { ctx.Dr3 = address as u64 }
+			if ctx.Dr3 != 0 { error!("DR3 isn't empty !"); return; } else { ctx.Dr3 = address as u64 }
 		},
 	};
 
@@ -72,14 +73,16 @@ pub fn set_breakpoint(dr: DebugRegister, address: *const u8, ctx: &mut CONTEXT, 
 	// Calculate which bits need to be turned on depending on the register
 	let n: u64 = dr as u64;
 	let l: u64 = n*2;               // Local breakpoints enable
-	let _g: u64 = l+1;              // Global breakpoints enable
-	let _cnd: u64 = 16+n*4;         // Conditions - we'll see if i add support for that
 	let len: u64 = 18+n*4;          // Length of address - only use 64bits so far, so 0b11
 	ctx.Dr7 |= l|len|(len+1);    // combine flags we use in a mask - the local enable | address length 0b11
 	ctx.Dr6 = 0;                 // Then zero DR6 for good figure
-	unsafe { HWBP_CALLBACK_TABLE[n as usize] = callback as _; }
-	// debug!(unsafe { HWBP_CALLBACK_TABLE });
+	debug!(ctx.Dr7);
 }
+
+pub fn register_callback(dr: DebugRegister, callback: *const fn()) {
+	unsafe { HWBP_CALLBACK_TABLE[dr as usize] = callback as _; }
+}
+
 
 /// Removes a breakpoint from the DR7 register
 pub fn remove_breakpoint(dr: DebugRegister, ctx: &mut CONTEXT) {
@@ -134,7 +137,7 @@ pub unsafe extern "system" fn vectored_handler(mut exception_info: PEXCEPTION_PO
 		let mut ctx = &mut (*(*exception_info).ContextRecord);
 
 		if rec.ExceptionCode == EXCEPTION_SINGLE_STEP && search_breakpoint(rec.ExceptionAddress, ctx).is_some() {
-			info!("Successfully hooked o//");
+			// info!("Successfully hooked o//");
 
 			// A bit of dark magic, as a treat
 			let callback_ptr = HWBP_CALLBACK_TABLE[search_breakpoint(rec.ExceptionAddress, ctx).unwrap() as usize];
