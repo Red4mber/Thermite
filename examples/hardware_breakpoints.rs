@@ -20,12 +20,12 @@ fn main() {
 	
 	// Loading a DLL to hook a function
 	// Here we target MessageBoxA as example
-	let messageboxa_address: *mut u8;
+	let messageboxa_address: *const u8;
 	unsafe {
 		let libname = CString::new("User32.dll");
 		let user32 = LoadLibraryA(libname.unwrap().as_ptr());
 
-		messageboxa_address = get_function_address("MessageBoxA", user32 as _).unwrap().cast_mut();
+		messageboxa_address = get_function_address("MessageBoxA", user32 as _).unwrap();
 	} // i'm using my own getprocadress nut i don't have a custom implementation of loadlibrary yet
 	
 	debug!(messageboxa_address, MessageBoxA as *const u8);

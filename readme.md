@@ -12,7 +12,7 @@ What is done yet ?
 * PEB Walking and enumeration using custom implementation of GetModuleHandle/GetProcAddress
 * Direct syscalls with dynamic syscall ID retrieval using a mix of techniques such as Hell's Gates and Halo's Gate/Tartarus gate.
 * Indirect syscalls (now with syscall sorting to retrieve SSNs o/)
-* Hooking via Hardware breakpoints (Patchless AMSI Bypass soon)
+* Hooking via Hardware breakpoints - (Patchless AMSI Bypass using this technique)
 
 Not much yet, but i've been working on it for around two weeks so give it time ^^
 
