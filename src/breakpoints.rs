@@ -7,6 +7,11 @@ use crate::enumeration::{get_process_id, get_thread_id};
 use crate::error;
 use crate::utils::get_empty_objectattributes;
 
+// TODO
+// - Handle Errors (Failed to open thread etc...) 
+// - Hook NtCreateThreadEx to put breakpoints for new threads 
+
+
 
 struct BreakpointDescriptor {
 	address: *const u8,
@@ -47,7 +52,7 @@ pub enum DR7 {
 pub enum BreakConditions { Execute = 0, Write = 1, IO = 2, ReadWrite = 3 }
 
 /// The four different registers available to put a breakpoint address in
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DebugRegister { DR0 = 0, DR1 = 1, DR2 = 2, DR3 = 3 }
 
 /// Sets up a new breakpoint
@@ -111,19 +116,53 @@ pub fn set_breakpoint(dr: DebugRegister, address: *const u8, callback: *const fn
 
 
 /// Removes a breakpoint from the DR7 register
-pub fn remove_breakpoint(dr: DebugRegister, ctx: &mut CONTEXT) {
+pub fn remove_breakpoint(dr: DebugRegister, thread_id: u64) {
+	let mut ctx: CONTEXT = unsafe { std::mem::zeroed() };
+	ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+
+	// If the thread ID isn't the current thread, we need to get a handle to the thread
+	let mut thread_handle = -2isize as HANDLE;
+	if thread_id != get_thread_id() {
+		let cid = CLIENT_ID {
+			UniqueProcess: get_process_id() as HANDLE,
+			UniqueThread: thread_id as HANDLE,
+		};
+		crate::indirect_syscall!("NtOpenThread", &mut thread_handle, THREAD_ALL_ACCESS, get_empty_objectattributes(), cid);
+	}
+
+	let status = crate::indirect_syscall!("NtGetContextThread", thread_handle, &mut ctx);
+	if status != 0 { error!(status); };
+
 	let mask: u64 = match dr {
-		DebugRegister::DR0 => { ctx.Dr0 = 0x00; DR7::L0 as u64 | DR7::LEN0 as u64 | DR7::CND0 as u64 },
-		DebugRegister::DR1 => { ctx.Dr1 = 0x00; DR7::L1 as u64 | DR7::LEN1 as u64 | DR7::CND1 as u64 },
-		DebugRegister::DR2 => { ctx.Dr2 = 0x00; DR7::L2 as u64 | DR7::LEN2 as u64 | DR7::CND2 as u64 },
-		DebugRegister::DR3 => { ctx.Dr3 = 0x00; DR7::L3 as u64 | DR7::LEN3 as u64 | DR7::CND3 as u64 },
+		DebugRegister::DR0 => {
+			ctx.Dr0 = 0x00;
+			DR7::L0 as u64 | DR7::LEN0 as u64 | DR7::CND0 as u64
+		},
+		DebugRegister::DR1 => {
+			ctx.Dr1 = 0x00;
+			DR7::L1 as u64 | DR7::LEN1 as u64 | DR7::CND1 as u64
+		},
+		DebugRegister::DR2 => {
+			ctx.Dr2 = 0x00;
+			DR7::L2 as u64 | DR7::LEN2 as u64 | DR7::CND2 as u64
+		},
+		DebugRegister::DR3 => {
+			ctx.Dr3 = 0x00;
+			DR7::L3 as u64 | DR7::LEN3 as u64 | DR7::CND3 as u64
+		},
 	};
 	ctx.Dr7 &= !mask;
 	ctx.Dr6 = 0;
 	ctx.EFlags = 0;
 
+	let status = crate::indirect_syscall!("NtSetContextThread", thread_handle, &mut ctx);
+	if status != 0 { error!(status); };
+	
+	unsafe {
+		let index = BREAKPOINTS.iter().position(|x| x.position == dr && x.thread_id == thread_id).unwrap();
+		BREAKPOINTS.remove(index);
+	}
 }
-
 /// Zero all debug registers - removes all flags and addresses
 pub fn remove_all_breakpoints(ctx: &mut CONTEXT) {
 	ctx.Dr0 = 0;
@@ -191,6 +230,17 @@ pub fn get_arguments(ctx: &CONTEXT, idx: i32) -> u64 {
 		_ => unsafe { *( (ctx.Rsp as *const u64).offset((idx + 1) as isize) ) }
 	}
 }
+
+// /// Sets the arguments passed to the hooked function by reading the context's registers // Stack Parameters still need fixing
+// pub fn set_arguments(ctx: &CONTEXT, idx: i32, value: u64) {
+// 	match idx {
+// 		0 => ctx.Rcx = value,
+// 		1 => ctx.Rdx = value,
+// 		2 => ctx.R8 = value,
+// 		3 => ctx.R9 = value,
+// 		_ => unsafe { ( *(ctx.Rsp as *const u64).offset((idx + 1) as isize) ) = value }
+// 	}
+// }
 
 pub fn set_ret_value(value: u64, ctx: &mut CONTEXT) { ctx.Rax = value; }
 

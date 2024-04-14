@@ -6,7 +6,7 @@ use winapi::um::winnt::{CONTEXT, CONTEXT_ALL, CONTEXT_DEBUG_REGISTERS};
 use winapi::um::winuser::MessageBoxA;
 
 use thermite::{debug, error, indirect_syscall as syscall, info};
-use thermite::breakpoints::{DebugRegister, set_breakpoint, vectored_handler};
+use thermite::breakpoints::{DebugRegister, remove_breakpoint, set_breakpoint, vectored_handler};
 use thermite::enumeration::get_thread_id;
 use thermite::peb_walk::get_function_address;
 
@@ -39,7 +39,7 @@ fn main() {
 	unsafe {
 		MessageBoxA(
 			0 as _,
-			"NOT THE HOOK\0".as_ptr() as _,
+			"THIS SHOULDN'T SHOW UP\0".as_ptr() as _,
 			0 as _,
 			0
 		);
@@ -47,7 +47,16 @@ fn main() {
 		// The hook is still active for the current thread, we can leave it until we quit the program, or remove it using "remove_breakpoint" or "remove_all_breakpoints"
 	}
 	info!("We back to main o/");
+	remove_breakpoint(DebugRegister::DR0, get_thread_id());
 	
+	// unsafe {
+	// 	MessageBoxA(
+	// 		0 as _,
+	// 		"THIS ONE SHOULD SHOW UP\0".as_ptr() as _,
+	// 		0 as _,
+	// 		0
+	// 	);
+	// }
 	// We do need to remove the exception handler tho
 	// Because this one is gonna stay even if the thread is no more
 	// This can (and will) cause issues
