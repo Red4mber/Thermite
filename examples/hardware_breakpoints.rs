@@ -7,6 +7,7 @@ use winapi::um::winuser::MessageBoxA;
 
 use thermite::{debug, error, indirect_syscall as syscall, info};
 use thermite::breakpoints::{DebugRegister, set_breakpoint, vectored_handler};
+use thermite::enumeration::get_thread_id;
 use thermite::peb_walk::get_function_address;
 
 
@@ -31,20 +32,8 @@ fn main() {
 	debug!(messageboxa_address, MessageBoxA as *const u8);
 	
 	
-	// Now that we have the address of a function to target,
-	// Let's prepare the thread context to set up a breakpoint 
-	let mut ctx: CONTEXT = unsafe { std::mem::zeroed() };
-	ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-	unsafe {
-		let status = syscall!("NtGetContextThread", -2isize, &mut ctx);
-		if status != 0 { debug!(status); };
-		// Everything is abstracted by the set_breakpoint function 
-		set_breakpoint(DebugRegister::DR0, messageboxa_address, &mut ctx, hook as _);
-
-		// Then we just need to apply the context, and the function should be hooked
-		let status = syscall!("NtSetContextThread", -2isize, &mut ctx);
-		if status != 0 { debug!(status); };
-	};
+	// Now that we have the address of a function to target, let's set a breakpoint
+	unsafe { set_breakpoint(DebugRegister::DR0, messageboxa_address, hook as _, get_thread_id()); };
 
 	// Calling MessageBoxA now should call our hook instead
 	unsafe {

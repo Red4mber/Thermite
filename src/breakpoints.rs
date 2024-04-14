@@ -1,15 +1,21 @@
+use ntapi::ntapi_base::CLIENT_ID;
 use winapi::um::minwinbase::EXCEPTION_SINGLE_STEP;
-use winapi::um::winnt::{CONTEXT, PEXCEPTION_POINTERS, PVOID};
+use winapi::um::winnt::{CONTEXT, CONTEXT_DEBUG_REGISTERS, HANDLE, PEXCEPTION_POINTERS, PVOID, THREAD_ALL_ACCESS};
 use winapi::vc::excpt::{EXCEPTION_CONTINUE_EXECUTION, EXCEPTION_CONTINUE_SEARCH};
 
+use crate::enumeration::{get_process_id, get_thread_id};
 use crate::error;
+use crate::utils::get_empty_objectattributes;
 
 
-/// Stores the function pointers of each hook callback
-/// There are 4 for the 4 different breakpoints we can set up
-/// They are set by the [set_breakpoint] function and used by our vectore exception handler [vectored_handler], which dispatches the calls to their respective callback
-static mut HWBP_CALLBACK_TABLE: [*const ();4] = [&(), &(), &(), &()];
+struct BreakpointDescriptor {
+	address: *const u8,
+	position: DebugRegister,
+	thread_id: u64,
+	callback: *const fn()
+}
 
+static mut BREAKPOINTS: Vec<BreakpointDescriptor> = Vec::new();
 
 // ENUMS
 /// Represents the various flags and fields found in the DR7 register
@@ -47,13 +53,28 @@ pub enum DebugRegister { DR0 = 0, DR1 = 1, DR2 = 2, DR3 = 3 }
 /// Sets up a new breakpoint
 ///
 /// Takes a debug register, the desired breakpoint address, a context and a function callback as argument.
-/// The debug register must be of type [DebugRegister]
-/// The address can be any valid address
-/// The context must be a valid context and must be a mutable reference
-/// The callback function is a function pointer, it can be of any type, just cast it using `*const _`
-pub fn set_breakpoint(dr: DebugRegister, address: *const u8, ctx: &mut CONTEXT, callback: *const fn()) {
+/// - The debug register must be of type [DebugRegister]
+/// - The address can be any valid address
+/// - The callback function is a function pointer, it can be of any type, just cast it using `*const _`
+/// - The thread ID mus be a valid thread ID
+pub fn set_breakpoint(dr: DebugRegister, address: *const u8, callback: *const fn(), thread_id: u64) {
+	let mut ctx: CONTEXT = unsafe { std::mem::zeroed() };
+	ctx.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+
+	// If the thread ID isn't the current thread, we need to get a handle to the thread
+	let mut thread_handle = -2isize as HANDLE;
+	if thread_id != get_thread_id() {
+		let cid = CLIENT_ID {
+			UniqueProcess: get_process_id() as HANDLE,
+			UniqueThread: thread_id as HANDLE,
+		};
+		crate::indirect_syscall!("NtOpenThread", &mut thread_handle, THREAD_ALL_ACCESS, get_empty_objectattributes(), cid);
+	}
+
+	let status = crate::indirect_syscall!("NtGetContextThread", thread_handle, &mut ctx);
+	if status != 0 { error!(status); };
+
 	println!("Setting up breakpoint {:?} for address {:?}", dr, address);
-	register_callback(dr, callback);
 	match dr {
 		DebugRegister::DR0 => {
 			if ctx.Dr0 != 0 { error!("DR0 isn't empty !"); return; } else { ctx.Dr0 = address as u64 }
@@ -72,12 +93,20 @@ pub fn set_breakpoint(dr: DebugRegister, address: *const u8, ctx: &mut CONTEXT, 
 	let n: u64 = dr as u64;
 	let l: u64 = n*2;               // Local breakpoints enable
 	let len: u64 = 18+n*4;          // Length of address - only use 64bits so far, so 0b11
-	ctx.Dr7 |= l|len|(len+1);    // combine flags we use in a mask - the local enable | address length 0b11
-	ctx.Dr6 = 0;                 // Then zero DR6 for good figure
-}
+	ctx.Dr7 |= l|len|(len+1);       // combine flags we use in a mask - the local enable | address length 0b11
+	ctx.Dr6 = 0;                    // Then zero DR6 for good figure
 
-pub fn register_callback(dr: DebugRegister, callback: *const fn()) {
-	unsafe { HWBP_CALLBACK_TABLE[dr as usize] = callback as _; }
+	let status = crate::indirect_syscall!("NtSetContextThread", thread_handle, &mut ctx);
+	if status != 0 { error!(status); };
+
+	unsafe {
+		BREAKPOINTS.push(BreakpointDescriptor {
+			address,
+			position: dr,
+			thread_id,
+			callback,
+		})
+	}
 }
 
 
@@ -136,9 +165,14 @@ pub unsafe extern "system" fn vectored_handler(mut exception_info: PEXCEPTION_PO
 		if rec.ExceptionCode == EXCEPTION_SINGLE_STEP && search_breakpoint(rec.ExceptionAddress, ctx).is_some() {
 			// info!("Successfully hooked o//");
 
-			// A bit of dark magic, as a treat
-			let callback_ptr = HWBP_CALLBACK_TABLE[search_breakpoint(rec.ExceptionAddress, ctx).unwrap() as usize];
-			std::mem::transmute::<*const (), fn(&mut CONTEXT)>(callback_ptr)(ctx);
+			let callback = BREAKPOINTS.iter().filter_map(|x| {
+				if x.thread_id == get_thread_id() && x.address == rec.ExceptionAddress as *const u8 {
+					return Some(std::mem::transmute::<*const fn(), fn(&mut CONTEXT)>(x.callback));
+				}
+				return None;
+			}).next().unwrap(); // TODO: UGLY UNWRAP
+
+			callback(ctx);
 
 
 			return EXCEPTION_CONTINUE_EXECUTION;

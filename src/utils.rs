@@ -1,4 +1,4 @@
-use winapi::shared::ntdef::UNICODE_STRING;
+use winapi::shared::ntdef::{OBJECT_ATTRIBUTES, UNICODE_STRING};
 
 
 // Utility function to get an actual string from window's UNICODE_STRING
@@ -10,6 +10,17 @@ pub fn handle_unicode_string(uni: UNICODE_STRING) -> String {
 		)
 	};
 	 String::from_utf16_lossy(buffer)
+}
+
+pub fn get_empty_objectattributes() -> OBJECT_ATTRIBUTES {
+    OBJECT_ATTRIBUTES {
+        Length: std::mem::size_of::<OBJECT_ATTRIBUTES>() as _,
+        RootDirectory: 0u32 as _,
+        ObjectName: 0u32 as _,
+        Attributes: 0,
+        SecurityDescriptor: 0u32 as _,
+        SecurityQualityOfService: 0u32 as _,
+    }
 }
 
 
