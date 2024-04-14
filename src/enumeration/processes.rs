@@ -84,3 +84,14 @@ pub fn find_process_by_name(name: &str, proc_info_ptr: PSYSTEM_PROCESS_INFORMATI
 	let next = proc_info.NextEntryOffset;
 	if next.ne(&0) { unsafe { find_process_by_name(name, proc_info_ptr.byte_offset(next as isize)) } } else { None }
 }
+
+/// This function iterates over every [SystemProcessInformation] entry until it finds one with the matching PID
+pub fn find_process_by_pid(pid: u64, proc_info_ptr: PSYSTEM_PROCESS_INFORMATION) -> Option<PSYSTEM_PROCESS_INFORMATION> {
+	let proc_info = unsafe { *proc_info_ptr };
+	if pid == proc_info.UniqueProcessId as u64 {
+		return Some(proc_info_ptr);
+	}
+
+	let next = proc_info.NextEntryOffset;
+	if next.ne(&0) { unsafe { crate::enumeration::processes::find_process_by_pid(pid, proc_info_ptr.byte_offset(next as isize)) } } else { None }
+}
