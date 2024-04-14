@@ -14,9 +14,9 @@ What is done yet ?
 * Indirect syscalls (now with syscall sorting to retrieve SSNs o/)
 * Hooking via Hardware breakpoints - (Patchless AMSI Bypass using this technique)
 
-Not much yet, but i've been working on it for around two weeks so give it time ^^
-
 I am also currently working on various other techniques such as process enumeration, etw/amsi patching, PPID spoofing etc… Everything is not online yet, but I try to update the repository as regularly as possible.
+
+Go checkl [the examples](/examples/readme.md) !
 
 ##### Just go check out the code :D
 
