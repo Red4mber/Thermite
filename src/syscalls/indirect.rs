@@ -43,7 +43,7 @@ indirect_execute:
 extern "C" {
 	/// Imported from the assembly code above
 	///
-	/// Not really made to be called directly, it is better to use the [`thermite::syscall`] macro.
+	/// Not made to be called directly, it is better to use the [`thermite::syscall`] macro.
 	///
 	/// ### Arguments :
 	///  - `ssn` : 16-bit unsigned int, the System Service Number of the syscall you want to call
