@@ -15,8 +15,7 @@ This has the added benefit of storing the number of stack parameters in RCX, bec
 This has even a third benefit, when looping using the REP instruction, RCX gets decremented,
 giving us a 3-for-1 combo = Comparison + Counter + Loop in a single register o//
 
-It's quite a smart solution and I take absolutely zero credit for it, I found this on GitHub
-I tried rewriting it myself but end up rewriting exactly the same stub each time :|
+It's quite a smart solution and I take absolutely zero credit for it, I just plundered this stub on GitHub 
                 ___go check janoglezcampos/syscall-rs on GitHub___
 */
 global_asm!(
@@ -57,7 +56,7 @@ direct_execute:
 extern "C" {
     /// Imported from the assembly stub
     ///
-    /// Not really made to be called directly, it is better to use the [`thermite::syscall`] macro.
+    /// Not made to be called directly, it is better to use the [`thermite::syscall`] macro.
     ///
     /// ### Arguments :
     ///  - `ssn` : 16-bit unsigned int, the System Service Number of the syscall you want to call
