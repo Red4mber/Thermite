@@ -1,15 +1,22 @@
 # Thermite: Offensive Rust
 
-A malware development project written entirely in Rust.
+## Summary 
+:fr: \
+Thermite est une bibliothèque de développement de logiciels malveillants écrite entièrement en Rust. \
+Il implémente diverses techniques offensives telles que la marche PEB, les appels système directs et indirects, et le hooking par points d'arrêt matériels. Bien que présenté comme un outil d'apprentissage, le projet n'est pas destiné à une utilisation lors d'engagements réels.
 
-Despite the presentation as a library, my only goal making this was to learn, 
-I never really planned for it to be public and I will probably not maintain it regularly, so expect bugs and broken functionnalities. 
+:us: \
+A malware development project written entirely in Rust. \
+Thermite is a malware development library written entirely in Rust. It implements various offensive techniques such as PEB walking, direct and indirect system calls, and hardware breakpoint hooking. Although presented as a learning tool, the project is not intended for real-world use.
 
+
+
+## A short disclaimer
+
+Despite the presentation as a library, my only goal making this was to learn and I never really planned for it to be public I will probably not maintain it regularly, so expect a few bugs. \
 However, do note that all [the examples](/examples/readme.md) included in the repository work and have been tested. 
 
-## Summary
-
-What is done yet ?
+### Core functionnalities
 
 * **PEB Walking** and enumeration using custom implementation of GetModuleHandle/GetProcAddress
 * **Direct syscalls** with dynamic syscall ID retrieval using a mix of techniques such as Hell's Gates and Halo's Gate/Tartarus gate.
