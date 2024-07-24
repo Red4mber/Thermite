@@ -3,11 +3,11 @@
 ## Summary 
 :fr: \
 Thermite est une bibliothèque de développement de logiciels malveillants écrite entièrement en Rust. \
-Il implémente diverses techniques offensives telles que la marche PEB, les appels système directs et indirects, et le hooking par points d'arrêt matériels. Bien que présenté comme un outil d'apprentissage, le projet n'est pas destiné à une utilisation lors d'engagements réels.
+Il implémente diverses techniques offensives telles que la marche PEB, les appels système directs et indirects, et le hooking par points d'arrêt matériels. 
 
 :us: \
 A malware development project written entirely in Rust. \
-Thermite is a malware development library written entirely in Rust. It implements various offensive techniques such as PEB walking, direct and indirect system calls, and hardware breakpoint hooking. Although presented as a learning tool, the project is not intended for real-world use.
+Thermite is a malware development library written entirely in Rust. It implements various offensive techniques such as PEB walking, direct and indirect system calls, and hardware breakpoint hooking.
 
 
 
