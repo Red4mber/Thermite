@@ -6,9 +6,6 @@ pub mod processes;
 
 
 /// Reads the current process's command line from the Process Environment Block.
-///
-/// # Safety  
-/// This function is unsafe because it relies on the correct structure of the Process Environment Block.  
 ///  
 /// # Returns  
 /// Returns a vector containing every environment variables as `String` (with the format "KEY=value")
@@ -39,9 +36,6 @@ pub fn get_environment_var(var: &str) -> Option<String> {
 
 
 /// Returns the current process's command line from the Process Environment Block.
-///
-/// # Safety  
-/// This function is unsafe because it relies on the correct structure of the Process Environment Block.  
 ///  
 /// # Returns  
 /// The command line as a `String`
@@ -67,9 +61,6 @@ pub unsafe fn get_os_version() -> (u32, u32, u32) {
 
 
 /// Returns the current working directory of the process from the Process Environment Block.
-///
-/// # Safety  
-/// This function is unsafe because it relies on the correct structure of the Process Environment Block.  
 ///  
 /// # Returns  
 /// The current working directory as a `String`
