@@ -51,6 +51,21 @@ pub unsafe fn get_command_line() -> String {
 }
 
 
+/// Returns the OS Version.
+///
+/// # Safety  
+/// This function is unsafe because it relies on the correct structure of the Process Environment Block.  
+///  
+/// # Returns  
+/// Returns the OS Version as a tuple containing the Major version, Minor version and Build number
+/// 
+pub unsafe fn get_os_version() -> (u32, u32, u32) {
+	let peb_ptr = thermite::peb_walk::get_peb_address();
+	((*peb_ptr).OSMajorVersion, (*peb_ptr).OSMinorVersion, (*peb_ptr).OSMajorVersion)
+}
+
+
+
 /// Returns the current working directory of the process from the Process Environment Block.
 ///
 /// # Safety  
