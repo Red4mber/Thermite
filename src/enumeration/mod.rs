@@ -55,7 +55,7 @@ pub unsafe fn get_command_line() -> String {
 /// 
 pub unsafe fn get_os_version() -> (u32, u32, u32) {
 	let peb_ptr = thermite::peb_walk::get_peb_address();
-	((*peb_ptr).OSMajorVersion, (*peb_ptr).OSMinorVersion, (*peb_ptr).OSMajorVersion)
+	((*peb_ptr).OSMajorVersion, (*peb_ptr).OSMinorVersion, (*peb_ptr).OSBuildNumber as u32)
 }
 
 
